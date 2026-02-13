@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import jwt from '@fastify/jwt';
+import formbody from '@fastify/formbody';
 
 import { env } from './config/env.js';
 import { logger } from './utils/logger.js';
@@ -53,6 +54,9 @@ async function buildServer() {
     secret: env.JWT_SECRET,
     sign: { expiresIn: env.JWT_ACCESS_EXPIRY },
   });
+
+  // Parse application/x-www-form-urlencoded (required for Twilio webhooks)
+  await app.register(formbody);
 
   // ─── Health Check ─────────────────────────────────────────────────────────
 
