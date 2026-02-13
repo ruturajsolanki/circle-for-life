@@ -1,0 +1,56 @@
+{
+  "expo": {
+    "name": "Circle for Life",
+    "slug": "circle-for-life",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "circleforlife",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0D0D0F"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "app.circleforlife.ios",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Circle for Life needs access to save and share your creations.",
+        "NSCameraUsageDescription": "Circle for Life needs camera access for profile photos.",
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": false,
+          "NSExceptionDomains": {
+            "circleforlife.app": {
+              "NSExceptionAllowsInsecureHTTPLoads": false
+            }
+          }
+        }
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0D0D0F"
+      },
+      "package": "app.circleforlife.android",
+      "permissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.VIBRATE"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-image",
+      "expo-haptics"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
