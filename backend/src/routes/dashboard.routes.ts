@@ -5885,7 +5885,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
         '<div style="text-align:center;"><div style="font-size:20px;font-weight:700;color:var(--accent);">' + msgCount + '</div><div style="font-size:10px;color:var(--text3);text-transform:uppercase;">Messages</div></div>' +
       '</div>' +
       (summary ? '<div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:16px;"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;font-weight:600;margin-bottom:4px;">Summary</div><div style="font-size:13px;color:var(--text);line-height:1.5;">' + esc(summary) + '</div></div>' : '') +
-      '<button onclick="document.getElementById(\'callSummaryCard\').remove();document.getElementById(\'callSummaryBg\').remove();" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--accent);color:#fff;font-weight:600;font-size:13px;cursor:pointer;">Done</button>';
+      '<button id="callSummaryDoneBtn" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--accent);color:#fff;font-weight:600;font-size:13px;cursor:pointer;">Done</button>';
 
     var bg = document.createElement('div');
     bg.id = 'callSummaryBg';
@@ -5894,6 +5894,8 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
 
     document.body.appendChild(bg);
     document.body.appendChild(card);
+    var doneBtn = document.getElementById('callSummaryDoneBtn');
+    if (doneBtn) doneBtn.onclick = function() { card.remove(); bg.remove(); };
   }
 
   // ── Agent settings persistence ──
