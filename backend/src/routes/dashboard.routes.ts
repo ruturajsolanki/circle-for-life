@@ -712,6 +712,123 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
           </div>
         </div>
       </div>
+
+      <!-- Platform Configuration (super_admin only) -->
+      <div id="platformConfigPanel" style="display:none;margin-top:24px;">
+        <div class="card">
+          <div style="padding:24px;">
+            <h3 style="font-size:16px;font-weight:700;margin:0 0 4px;display:flex;align-items:center;gap:8px;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><path d="M12.22 2h-.44a2 2 0 00-2 2v.18a2 2 0 01-1 1.73l-.43.25a2 2 0 01-2 0l-.15-.08a2 2 0 00-2.73.73l-.22.38a2 2 0 00.73 2.73l.15.1a2 2 0 011 1.72v.51a2 2 0 01-1 1.74l-.15.09a2 2 0 00-.73 2.73l.22.38a2 2 0 002.73.73l.15-.08a2 2 0 012 0l.43.25a2 2 0 011 1.73V20a2 2 0 002 2h.44a2 2 0 002-2v-.18a2 2 0 011-1.73l.43-.25a2 2 0 012 0l.15.08a2 2 0 002.73-.73l.22-.39a2 2 0 00-.73-2.73l-.15-.08a2 2 0 01-1-1.74v-.5a2 2 0 011-1.74l.15-.09a2 2 0 00.73-2.73l-.22-.38a2 2 0 00-2.73-.73l-.15.08a2 2 0 01-2 0l-.43-.25a2 2 0 01-1-1.73V4a2 2 0 00-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+              Platform Configuration
+            </h3>
+            <p style="font-size:12px;color:var(--text3);margin:0 0 20px;">Runtime settings for phone calls, AI providers, and integrations. Changes take effect immediately.</p>
+
+            <!-- Phone Numbers -->
+            <div style="margin-bottom:20px;">
+              <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border);">Phone &amp; Twilio</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div>
+                  <label style="font-size:11px;font-weight:600;color:var(--text3);display:block;margin-bottom:4px;">Admin Phone (escalation)</label>
+                  <input type="text" class="form-input" id="cfgAdminPhone" placeholder="+919512373608" style="font-size:13px;">
+                </div>
+                <div>
+                  <label style="font-size:11px;font-weight:600;color:var(--text3);display:block;margin-bottom:4px;">Twilio Phone Number</label>
+                  <input type="text" class="form-input" id="cfgTwilioPhone" placeholder="+13237843509" style="font-size:13px;">
+                </div>
+              </div>
+            </div>
+
+            <!-- LLM Provider -->
+            <div style="margin-bottom:20px;">
+              <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border);">AI / LLM for Phone Calls</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div>
+                  <label style="font-size:11px;font-weight:600;color:var(--text3);display:block;margin-bottom:4px;">Groq API Key</label>
+                  <input type="password" class="form-input" id="cfgGroqKey" placeholder="gsk_..." style="font-size:13px;">
+                </div>
+                <div>
+                  <label style="font-size:11px;font-weight:600;color:var(--text3);display:block;margin-bottom:4px;">OpenAI API Key</label>
+                  <input type="password" class="form-input" id="cfgOpenaiKey" placeholder="sk-..." style="font-size:13px;">
+                </div>
+                <div>
+                  <label style="font-size:11px;font-weight:600;color:var(--text3);display:block;margin-bottom:4px;">Anthropic API Key</label>
+                  <input type="password" class="form-input" id="cfgAnthropicKey" placeholder="sk-ant-..." style="font-size:13px;">
+                </div>
+                <div>
+                  <label style="font-size:11px;font-weight:600;color:var(--text3);display:block;margin-bottom:4px;">Google API Key</label>
+                  <input type="password" class="form-input" id="cfgGoogleKey" placeholder="AI..." style="font-size:13px;">
+                </div>
+                <div>
+                  <label style="font-size:11px;font-weight:600;color:var(--text3);display:block;margin-bottom:4px;">OpenRouter API Key</label>
+                  <input type="password" class="form-input" id="cfgOpenrouterKey" placeholder="sk-or-..." style="font-size:13px;">
+                </div>
+                <div>
+                  <label style="font-size:11px;font-weight:600;color:var(--text3);display:block;margin-bottom:4px;">Together API Key</label>
+                  <input type="password" class="form-input" id="cfgTogetherKey" placeholder="" style="font-size:13px;">
+                </div>
+                <div>
+                  <label style="font-size:11px;font-weight:600;color:var(--text3);display:block;margin-bottom:4px;">DeepSeek API Key</label>
+                  <input type="password" class="form-input" id="cfgDeepseekKey" placeholder="" style="font-size:13px;">
+                </div>
+                <div>
+                  <label style="font-size:11px;font-weight:600;color:var(--text3);display:block;margin-bottom:4px;">Mistral API Key</label>
+                  <input type="password" class="form-input" id="cfgMistralKey" placeholder="" style="font-size:13px;">
+                </div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+                <div>
+                  <label style="font-size:11px;font-weight:600;color:var(--text3);display:block;margin-bottom:4px;">Default LLM Provider</label>
+                  <select class="form-input" id="cfgDefaultProvider" style="font-size:13px;">
+                    <option value="">-- not set --</option>
+                    <option value="groq">Groq</option>
+                    <option value="openai">OpenAI</option>
+                    <option value="anthropic">Anthropic</option>
+                    <option value="google">Google</option>
+                    <option value="openrouter">OpenRouter</option>
+                    <option value="together">Together</option>
+                    <option value="deepseek">DeepSeek</option>
+                    <option value="mistral">Mistral</option>
+                  </select>
+                </div>
+                <div>
+                  <label style="font-size:11px;font-weight:600;color:var(--text3);display:block;margin-bottom:4px;">Default LLM Key</label>
+                  <input type="password" class="form-input" id="cfgDefaultKey" placeholder="API key for default provider" style="font-size:13px;">
+                </div>
+              </div>
+            </div>
+
+            <!-- Kaggle & ElevenLabs -->
+            <div style="margin-bottom:20px;">
+              <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border);">Kaggle &amp; Voice</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div>
+                  <label style="font-size:11px;font-weight:600;color:var(--text3);display:block;margin-bottom:4px;">Kaggle Ollama URL</label>
+                  <input type="text" class="form-input" id="cfgKaggleUrl" placeholder="https://xxxx.ngrok-free.app" style="font-size:13px;">
+                </div>
+                <div>
+                  <label style="font-size:11px;font-weight:600;color:var(--text3);display:block;margin-bottom:4px;">ElevenLabs API Key</label>
+                  <input type="password" class="form-input" id="cfgElevenLabsKey" placeholder="" style="font-size:13px;">
+                </div>
+              </div>
+            </div>
+
+            <!-- Server URL -->
+            <div style="margin-bottom:20px;">
+              <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border);">Server</div>
+              <div>
+                <label style="font-size:11px;font-weight:600;color:var(--text3);display:block;margin-bottom:4px;">Server URL (for Twilio webhooks)</label>
+                <input type="text" class="form-input" id="cfgServerUrl" placeholder="https://your-app.up.railway.app" style="font-size:13px;">
+              </div>
+            </div>
+
+            <div style="display:flex;gap:10px;align-items:center;">
+              <button class="btn-primary" onclick="savePlatformConfig()" style="padding:10px 28px;font-size:14px;" id="savePlatformConfigBtn">Save Configuration</button>
+              <button class="btn-small" onclick="loadPlatformConfig()" style="padding:8px 16px;">Reload</button>
+              <span id="platformConfigStatus" style="font-size:12px;color:var(--text3);"></span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Chat -->
@@ -2038,6 +2155,17 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     } else {
       featEl.innerHTML = '<span style="font-size:12px;color:var(--text3);">Level up to unlock features!</span>';
     }
+
+    // Show Platform Config panel for super_admin only
+    var cfgPanel = document.getElementById('platformConfigPanel');
+    if (cfgPanel) {
+      if (u.role === 'super_admin') {
+        cfgPanel.style.display = '';
+        loadPlatformConfig();
+      } else {
+        cfgPanel.style.display = 'none';
+      }
+    }
   }
 
   async function saveProfile() {
@@ -2086,6 +2214,70 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     document.getElementById('editAvatarUrl').value = url;
     document.getElementById('avatarUrlInput').style.display = 'none';
     saveProfile();
+  }
+
+  // ── Platform Config (super_admin) ──
+  var _cfgFieldMap = {
+    'cfgAdminPhone': 'ADMIN_PHONE_NUMBER',
+    'cfgTwilioPhone': 'TWILIO_PHONE_NUMBER',
+    'cfgGroqKey': 'GROQ_API_KEY',
+    'cfgOpenaiKey': 'OPENAI_API_KEY',
+    'cfgAnthropicKey': 'ANTHROPIC_API_KEY',
+    'cfgGoogleKey': 'GOOGLE_API_KEY',
+    'cfgOpenrouterKey': 'OPENROUTER_API_KEY',
+    'cfgTogetherKey': 'TOGETHER_API_KEY',
+    'cfgDeepseekKey': 'DEEPSEEK_API_KEY',
+    'cfgMistralKey': 'MISTRAL_API_KEY',
+    'cfgDefaultProvider': 'DEFAULT_LLM_PROVIDER',
+    'cfgDefaultKey': 'DEFAULT_LLM_KEY',
+    'cfgKaggleUrl': 'KAGGLE_OLLAMA_URL',
+    'cfgElevenLabsKey': 'ELEVENLABS_API_KEY',
+    'cfgServerUrl': 'SERVER_URL',
+  };
+
+  async function loadPlatformConfig() {
+    try {
+      var d = await api('GET', '/v1/agent-calls/admin/platform-config');
+      for (var fieldId in _cfgFieldMap) {
+        var envKey = _cfgFieldMap[fieldId];
+        var el = document.getElementById(fieldId);
+        if (el) el.value = d[envKey] || '';
+      }
+    } catch (e) {
+      console.warn('Failed to load platform config:', e.message);
+    }
+  }
+
+  async function savePlatformConfig() {
+    var btn = document.getElementById('savePlatformConfigBtn');
+    var status = document.getElementById('platformConfigStatus');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+    status.textContent = '';
+
+    try {
+      var body = {};
+      for (var fieldId in _cfgFieldMap) {
+        var envKey = _cfgFieldMap[fieldId];
+        var el = document.getElementById(fieldId);
+        if (el) body[envKey] = el.value.trim();
+      }
+
+      var d = await api('PUT', '/v1/agent-calls/admin/platform-config', body);
+      status.style.color = 'var(--green)';
+      status.textContent = 'Saved! Updated: ' + (d.updated || []).join(', ');
+      toast('Platform config saved!', 'ok');
+
+      // Reload to show masked values
+      setTimeout(loadPlatformConfig, 500);
+    } catch (e) {
+      status.style.color = 'var(--red)';
+      status.textContent = 'Error: ' + e.message;
+      toast('Failed to save config: ' + e.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Save Configuration';
+    }
   }
 
   // ── Overview ──

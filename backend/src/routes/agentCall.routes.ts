@@ -937,6 +937,65 @@ export async function agentCallRoutes(app: FastifyInstance) {
     }
     return { activeCalls };
   });
+
+  // ═══ GET /admin/platform-config — Read runtime config (super_admin only) ════
+  app.get('/admin/platform-config', {
+    preHandler: [localAuthenticate, requirePermission('system.config')],
+  }, async () => {
+    // Return current config — mask API keys (show last 4 chars only)
+    const mask = (val?: string) => val ? ('*'.repeat(Math.max(0, val.length - 4)) + val.slice(-4)) : '';
+    return {
+      ADMIN_PHONE_NUMBER: process.env.ADMIN_PHONE_NUMBER || '',
+      TWILIO_PHONE_NUMBER: process.env.TWILIO_PHONE_NUMBER || '',
+      GROQ_API_KEY: mask(process.env.GROQ_API_KEY),
+      OPENAI_API_KEY: mask(process.env.OPENAI_API_KEY),
+      ANTHROPIC_API_KEY: mask(process.env.ANTHROPIC_API_KEY),
+      GOOGLE_API_KEY: mask(process.env.GOOGLE_API_KEY),
+      OPENROUTER_API_KEY: mask(process.env.OPENROUTER_API_KEY),
+      TOGETHER_API_KEY: mask(process.env.TOGETHER_API_KEY),
+      DEEPSEEK_API_KEY: mask(process.env.DEEPSEEK_API_KEY),
+      MISTRAL_API_KEY: mask(process.env.MISTRAL_API_KEY),
+      DEFAULT_LLM_PROVIDER: process.env.DEFAULT_LLM_PROVIDER || '',
+      DEFAULT_LLM_KEY: mask(process.env.DEFAULT_LLM_KEY),
+      KAGGLE_OLLAMA_URL: process.env.KAGGLE_OLLAMA_URL || '',
+      ELEVENLABS_API_KEY: mask(process.env.ELEVENLABS_API_KEY),
+      SERVER_URL: process.env.SERVER_URL || '',
+    };
+  });
+
+  // ═══ PUT /admin/platform-config — Update runtime config (super_admin only) ══
+  app.put('/admin/platform-config', {
+    preHandler: [localAuthenticate, requirePermission('system.config')],
+  }, async (request: any) => {
+    const body = request.body || {};
+    const ALLOWED_KEYS = [
+      'ADMIN_PHONE_NUMBER', 'TWILIO_PHONE_NUMBER',
+      'GROQ_API_KEY', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY',
+      'GOOGLE_API_KEY', 'OPENROUTER_API_KEY', 'TOGETHER_API_KEY',
+      'DEEPSEEK_API_KEY', 'MISTRAL_API_KEY',
+      'DEFAULT_LLM_PROVIDER', 'DEFAULT_LLM_KEY',
+      'KAGGLE_OLLAMA_URL', 'ELEVENLABS_API_KEY', 'SERVER_URL',
+    ];
+
+    const updated: string[] = [];
+    for (const key of ALLOWED_KEYS) {
+      if (key in body) {
+        const val = String(body[key]).trim();
+        // Skip masked values (they start with ***) — means user didn't change them
+        if (val.startsWith('***')) continue;
+        if (val === '') {
+          delete process.env[key];
+          updated.push(key + ' (cleared)');
+        } else {
+          process.env[key] = val;
+          updated.push(key);
+        }
+      }
+    }
+
+    logger.info('Platform config updated by super_admin:', updated);
+    return { ok: true, updated };
+  });
 }
 
 // ─── Supervisor Analysis ─────────────────────────────────────────────────────
