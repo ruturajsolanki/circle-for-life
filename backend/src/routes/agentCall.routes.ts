@@ -243,7 +243,7 @@ export async function agentCallRoutes(app: FastifyInstance) {
       ],
       supervisorNotes: [],
       providerConfig: body.provider ? body.provider as ProviderConfig : null,
-      elevenLabsKey: body.elevenLabsKey || '',
+      elevenLabsKey: body.elevenLabsKey || process.env.ELEVENLABS_API_KEY || '',
       startedAt: now,
       endedAt: '',
       summary: '',
@@ -252,22 +252,25 @@ export async function agentCallRoutes(app: FastifyInstance) {
 
     activeSessions.set(sessionId, session);
 
-    // Generate TTS for greeting if ElevenLabs key provided
+    // Resolve ElevenLabs key: client → server env → none
+    const elevenKey = body.elevenLabsKey || process.env.ELEVENLABS_API_KEY || '';
+
+    // Generate TTS for greeting if ElevenLabs key available
     let greetingAudio = '';
     let voiceEngine = 'web_speech';
-    if (body.elevenLabsKey) {
+    if (elevenKey) {
       try {
-        logger.info(`Generating ElevenLabs greeting TTS for agent ${agent.id} (voice: ${agent.voiceId})`);
+        logger.info(`Generating ElevenLabs greeting TTS for agent ${agent.id} (voice: ${agent.voiceId}), keySource=${body.elevenLabsKey ? 'client' : 'server_env'}`);
         const ttsResp = await axios.post(
           `https://api.elevenlabs.io/v1/text-to-speech/${agent.voiceId}`,
           {
             text: agent.greeting,
-            model_id: 'eleven_monolingual_v1',
-            voice_settings: { stability: 0.5, similarity_boost: 0.75 },
+            model_id: 'eleven_multilingual_v2',
+            voice_settings: { stability: 0.5, similarity_boost: 0.8, style: 0.3, use_speaker_boost: true },
           },
           {
             headers: {
-              'xi-api-key': body.elevenLabsKey,
+              'xi-api-key': elevenKey,
               'Content-Type': 'application/json',
               Accept: 'audio/mpeg',
             },
@@ -283,9 +286,12 @@ export async function agentCallRoutes(app: FastifyInstance) {
           status: e?.response?.status,
           data: e?.response?.data ? Buffer.from(e.response.data).toString('utf8').substring(0, 300) : null,
           message: e.message,
+          hint: e?.response?.status === 401 ? 'Invalid API key — check ELEVENLABS_API_KEY or the key on the Agent page' : '',
         });
         // Will fall back to Web Speech on the client
       }
+    } else {
+      logger.info('No ElevenLabs key — using Web Speech fallback');
     }
 
     return reply.status(201).send({
@@ -361,20 +367,21 @@ export async function agentCallRoutes(app: FastifyInstance) {
     const agentTime = new Date().toISOString();
     session.transcript.push({ role: 'agent', text: responseText, timestamp: agentTime });
 
-    // Generate TTS via ElevenLabs (if key provided)
+    // Generate TTS via ElevenLabs (session key → server env → skip)
     let audioBase64 = '';
-    if (session.elevenLabsKey) {
+    const msgElevenKey = session.elevenLabsKey || process.env.ELEVENLABS_API_KEY || '';
+    if (msgElevenKey) {
       try {
         const ttsResp = await axios.post(
           `https://api.elevenlabs.io/v1/text-to-speech/${agent.voiceId}`,
           {
             text: responseText,
-            model_id: 'eleven_monolingual_v1',
-            voice_settings: { stability: 0.5, similarity_boost: 0.75 },
+            model_id: 'eleven_multilingual_v2',
+            voice_settings: { stability: 0.5, similarity_boost: 0.8, style: 0.3, use_speaker_boost: true },
           },
           {
             headers: {
-              'xi-api-key': session.elevenLabsKey,
+              'xi-api-key': msgElevenKey,
               'Content-Type': 'application/json',
               Accept: 'audio/mpeg',
             },
