@@ -372,10 +372,25 @@ export async function agentCallRoutes(app: FastifyInstance) {
     const msgElevenKey = session.elevenLabsKey || process.env.ELEVENLABS_API_KEY || '';
     if (msgElevenKey) {
       try {
+        // Clean up text for TTS: strip markdown, limit length, remove special chars
+        let ttsText = responseText
+          .replace(/```[\s\S]*?```/g, ' (code omitted) ')   // Remove code blocks
+          .replace(/[*_~`#>]/g, '')                          // Strip markdown chars
+          .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')          // Links → just text
+          .replace(/\n+/g, '. ')                             // Newlines → pauses
+          .replace(/\s+/g, ' ')                              // Collapse whitespace
+          .trim();
+        // ElevenLabs max ~5000 chars; truncate long responses
+        if (ttsText.length > 2000) {
+          ttsText = ttsText.substring(0, 1997) + '...';
+        }
+
+        logger.info(`ElevenLabs TTS message: voiceId=${agent.voiceId}, textLen=${ttsText.length}, keySource=${session.elevenLabsKey ? 'session' : 'env'}`);
+
         const ttsResp = await axios.post(
           `https://api.elevenlabs.io/v1/text-to-speech/${agent.voiceId}`,
           {
-            text: responseText,
+            text: ttsText,
             model_id: 'eleven_multilingual_v2',
             voice_settings: { stability: 0.5, similarity_boost: 0.8, style: 0.3, use_speaker_boost: true },
           },
@@ -386,16 +401,14 @@ export async function agentCallRoutes(app: FastifyInstance) {
               Accept: 'audio/mpeg',
             },
             responseType: 'arraybuffer',
-            timeout: 15000,
+            timeout: 30000,
           },
         );
         audioBase64 = Buffer.from(ttsResp.data).toString('base64');
+        logger.info(`ElevenLabs TTS message OK (${audioBase64.length} bytes base64)`);
       } catch (e: any) {
-        logger.error('ElevenLabs TTS message FAILED:', {
-          status: e?.response?.status,
-          message: e.message,
-          hint: e?.response?.status === 401 ? 'Invalid API key' : e?.response?.status === 422 ? 'Invalid voice ID or quota exceeded' : '',
-        });
+        const errBody = e?.response?.data ? Buffer.from(e.response.data).toString('utf8').substring(0, 500) : '';
+        logger.error(`ElevenLabs TTS message FAILED: status=${e?.response?.status}, msg=${e.message}, body=${errBody}`);
         // Falls back to Web Speech on client side
       }
     }
