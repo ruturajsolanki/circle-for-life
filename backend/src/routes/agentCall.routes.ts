@@ -702,6 +702,8 @@ export async function agentCallRoutes(app: FastifyInstance) {
     const agent = AGENTS.find(a => a.id === session.agentId)!;
     let responseText = "I'm sorry, I couldn't process that. Could you try again?";
 
+    let llmFailed = false;
+
     if (session.providerConfig && session.providerConfig.apiKey) {
       try {
         const messages: ChatMessage[] = [
@@ -712,6 +714,8 @@ export async function agentCallRoutes(app: FastifyInstance) {
           })),
         ];
 
+        logger.info(`Phone LLM call: provider=${session.providerConfig.provider}, model=${session.providerConfig.model || 'default'}, baseUrl=${session.providerConfig.baseUrl || 'none'}`);
+
         const resp = await ControlPanelService.chat({
           provider: session.providerConfig,
           messages,
@@ -720,11 +724,40 @@ export async function agentCallRoutes(app: FastifyInstance) {
         });
         responseText = resp.content;
       } catch (e: any) {
-        logger.error('Phone AI error:', e.message);
-        responseText = "I'm having some technical difficulties. Let me connect you with a real person.";
+        logger.error('Phone AI error:', e.message, e.response?.status, e.response?.data);
+        llmFailed = true;
       }
     } else {
-      responseText = "I'm not able to process requests right now. Let me connect you with a real person.";
+      logger.error('Phone call: No LLM provider configured for session', sessionId);
+      llmFailed = true;
+    }
+
+    // If LLM failed, try to connect to a real person
+    if (llmFailed) {
+      const adminPhone = process.env.ADMIN_PHONE_NUMBER;
+      session.status = 'escalated';
+      session.transcript.push({
+        role: 'system',
+        text: 'LLM unavailable — auto-escalated to human support.',
+        timestamp: new Date().toISOString(),
+      });
+      logger.info(`Phone call LLM-failed escalation: ${sessionId} → ${adminPhone || 'NO ADMIN PHONE'}`);
+
+      if (adminPhone) {
+        reply.type('text/xml');
+        return `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="Polly.Joanna">I'm experiencing a technical issue. Let me connect you with a real person right away. Please hold.</Say>
+  <Dial callerId="${escapeXml(process.env.TWILIO_PHONE_NUMBER || '')}" timeout="30">${escapeXml(adminPhone)}</Dial>
+  <Say voice="Polly.Joanna">I'm sorry, the call could not be connected. Please try again later. Goodbye.</Say>
+</Response>`;
+      } else {
+        reply.type('text/xml');
+        return `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="Polly.Joanna">I'm sorry, I'm having technical difficulties and no support staff is available right now. Please try again later. Goodbye.</Say>
+</Response>`;
+      }
     }
 
     // Add agent response
@@ -1067,6 +1100,7 @@ function escapeXml(str: string): string {
 function getPhoneCallProvider(): ProviderConfig | null {
   // Priority 1: Dedicated phone LLM provider env vars
   if (process.env.PHONE_LLM_PROVIDER && process.env.PHONE_LLM_API_KEY) {
+    logger.info('Phone LLM: using dedicated PHONE_LLM_PROVIDER=' + process.env.PHONE_LLM_PROVIDER);
     return {
       provider: process.env.PHONE_LLM_PROVIDER as any,
       apiKey: process.env.PHONE_LLM_API_KEY,
@@ -1075,8 +1109,43 @@ function getPhoneCallProvider(): ProviderConfig | null {
     };
   }
 
-  // Priority 2: Kaggle/Ollama via KAGGLE_OLLAMA_URL env var
+  // Priority 2: Explicit default provider
+  if (process.env.DEFAULT_LLM_KEY) {
+    const prov = process.env.DEFAULT_LLM_PROVIDER || 'groq';
+    logger.info('Phone LLM: using DEFAULT_LLM_KEY with provider=' + prov);
+    return {
+      provider: prov as any,
+      apiKey: process.env.DEFAULT_LLM_KEY,
+      model: process.env.DEFAULT_LLM_MODEL,
+    };
+  }
+
+  // Priority 3: Auto-detect any cloud API key from env
+  const autoDetect: { env: string; provider: string; model: string }[] = [
+    { env: 'GROQ_API_KEY', provider: 'groq', model: 'llama-3.1-8b-instant' },
+    { env: 'OPENROUTER_API_KEY', provider: 'openrouter', model: 'meta-llama/llama-3.1-8b-instruct:free' },
+    { env: 'OPENAI_API_KEY', provider: 'openai', model: 'gpt-4o-mini' },
+    { env: 'ANTHROPIC_API_KEY', provider: 'anthropic', model: 'claude-3-haiku-20240307' },
+    { env: 'GOOGLE_API_KEY', provider: 'google', model: 'gemini-1.5-flash' },
+    { env: 'TOGETHER_API_KEY', provider: 'together', model: 'meta-llama/Llama-3-8b-chat-hf' },
+    { env: 'DEEPSEEK_API_KEY', provider: 'deepseek', model: 'deepseek-chat' },
+    { env: 'MISTRAL_API_KEY', provider: 'mistral', model: 'mistral-small-latest' },
+  ];
+
+  for (const d of autoDetect) {
+    if (process.env[d.env]) {
+      logger.info(`Phone LLM: auto-detected ${d.env} → provider=${d.provider}`);
+      return {
+        provider: d.provider as any,
+        apiKey: process.env[d.env]!,
+        model: d.model,
+      };
+    }
+  }
+
+  // Priority 4: Kaggle/Ollama (last because ngrok URLs expire often)
   if (process.env.KAGGLE_OLLAMA_URL) {
+    logger.info('Phone LLM: using KAGGLE_OLLAMA_URL=' + process.env.KAGGLE_OLLAMA_URL);
     return {
       provider: 'kaggle' as any,
       apiKey: 'ollama',
@@ -1085,15 +1154,6 @@ function getPhoneCallProvider(): ProviderConfig | null {
     };
   }
 
-  // Priority 3: Any default provider configured
-  if (process.env.DEFAULT_LLM_KEY) {
-    return {
-      provider: (process.env.DEFAULT_LLM_PROVIDER || 'groq') as any,
-      apiKey: process.env.DEFAULT_LLM_KEY,
-      model: process.env.DEFAULT_LLM_MODEL,
-    };
-  }
-
-  logger.warn('No LLM provider configured for phone calls. Set KAGGLE_OLLAMA_URL, PHONE_LLM_PROVIDER/KEY, or DEFAULT_LLM_KEY.');
+  logger.warn('No LLM provider configured for phone calls. Set DEFAULT_LLM_KEY, GROQ_API_KEY, PHONE_LLM_PROVIDER/KEY, or KAGGLE_OLLAMA_URL.');
   return null;
 }
