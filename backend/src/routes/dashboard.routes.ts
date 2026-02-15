@@ -269,6 +269,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     .btn-small { font-size:11px; padding:5px 12px; border-radius:6px; background:var(--surface); border:1px solid var(--border); color:var(--text2); cursor:pointer; }
     .btn-small:hover { background:var(--surface2); color:var(--accent); border-color:var(--accent); }
     .btn-small:active { transform:scale(0.97); }
+    .calllog-filter.active { background:var(--accent); color:#fff; border-color:var(--accent); }
     .btn-icon { background:none; border:none; cursor:pointer; color:var(--text2); padding:6px; border-radius:6px; }
     .btn-icon:hover { background:var(--surface2); color:var(--accent); }
 
@@ -1623,6 +1624,76 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
       </div>
     </div>
 
+    <!-- Call Logs Page -->
+    <div class="page" id="p-calllogs" style="display:none">
+      <div class="page-header">
+        <h2 class="page-title">Call Logs</h2>
+        <p class="page-subtitle">Full history of all agent calls — browser and phone</p>
+      </div>
+
+      <!-- Filters Bar -->
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px;">
+        <button class="btn-small calllog-filter active" data-filter="all" onclick="filterCallLogs('all')">All Calls</button>
+        <button class="btn-small calllog-filter" data-filter="browser" onclick="filterCallLogs('browser')">Browser</button>
+        <button class="btn-small calllog-filter" data-filter="phone" onclick="filterCallLogs('phone')">Phone</button>
+        <button class="btn-small calllog-filter" data-filter="escalated" onclick="filterCallLogs('escalated')">Escalated</button>
+        <button class="btn-small calllog-filter" data-filter="active" onclick="filterCallLogs('active')">Active Now</button>
+        <div style="flex:1;"></div>
+        <input type="text" class="form-input" id="callLogSearch" placeholder="Search calls..." oninput="filterCallLogs()" style="max-width:220px;font-size:12px;padding:6px 12px;">
+        <button class="btn-small" onclick="loadCallLogs()" title="Refresh">&#x21bb; Refresh</button>
+      </div>
+
+      <!-- Stats Row -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px;">
+        <div class="card" style="padding:14px;text-align:center;">
+          <div id="clStatTotal" style="font-size:22px;font-weight:700;color:var(--accent);">0</div>
+          <div style="font-size:10px;color:var(--text3);text-transform:uppercase;">Total Calls</div>
+        </div>
+        <div class="card" style="padding:14px;text-align:center;">
+          <div id="clStatPhone" style="font-size:22px;font-weight:700;color:#8b5cf6;">0</div>
+          <div style="font-size:10px;color:var(--text3);text-transform:uppercase;">Phone Calls</div>
+        </div>
+        <div class="card" style="padding:14px;text-align:center;">
+          <div id="clStatBrowser" style="font-size:22px;font-weight:700;color:#3b82f6;">0</div>
+          <div style="font-size:10px;color:var(--text3);text-transform:uppercase;">Browser Calls</div>
+        </div>
+        <div class="card" style="padding:14px;text-align:center;">
+          <div id="clStatEscalated" style="font-size:22px;font-weight:700;color:#ef4444;">0</div>
+          <div style="font-size:10px;color:var(--text3);text-transform:uppercase;">Escalated</div>
+        </div>
+        <div class="card" style="padding:14px;text-align:center;">
+          <div id="clStatActive" style="font-size:22px;font-weight:700;color:#22c55e;">0</div>
+          <div style="font-size:10px;color:var(--text3);text-transform:uppercase;">Active Now</div>
+        </div>
+      </div>
+
+      <!-- Call List -->
+      <div class="card" style="overflow:hidden;">
+        <div id="callLogsList" style="padding:12px;"></div>
+      </div>
+
+      <!-- Transcript Detail Modal -->
+      <div id="callDetailOverlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9000;background:rgba(0,0,0,0.6);overflow-y:auto;padding:30px;">
+        <div style="max-width:700px;margin:0 auto;background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;">
+          <!-- Header -->
+          <div id="callDetailHeader" style="padding:20px 24px;border-bottom:1px solid var(--border);background:var(--bg);"></div>
+          <!-- Summary -->
+          <div id="callDetailSummary" style="padding:16px 24px;border-bottom:1px solid var(--border);"></div>
+          <!-- Transcript -->
+          <div style="padding:16px 24px;">
+            <h4 style="font-size:13px;font-weight:700;margin:0 0 12px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;">Transcript</h4>
+            <div id="callDetailTranscript" style="max-height:400px;overflow-y:auto;"></div>
+          </div>
+          <!-- Supervisor Notes -->
+          <div id="callDetailSupervisor" style="display:none;padding:16px 24px;border-top:1px solid var(--border);"></div>
+          <!-- Close -->
+          <div style="padding:16px 24px;border-top:1px solid var(--border);text-align:center;">
+            <button class="btn-primary" onclick="document.getElementById('callDetailOverlay').style.display='none'" style="padding:10px 40px;">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -1818,6 +1889,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     { id: 'prompts', label: 'System Prompts', minLevel: 8, feature: 'system_config', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>' },
     { id: 'p2p', label: 'P2P Chat', minLevel: 10, feature: 'p2p_chat', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h8"/><circle cx="19" cy="5" r="3"/></svg>' },
     { id: 'agents', label: 'AI Agents', minLevel: 3, feature: 'ai_agents', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/></svg>' },
+    { id: 'calllogs', label: 'Call Logs', minLevel: 6, feature: 'full_admin', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10,9 9,9 8,9"/></svg>' },
   ];
 
   // ── Init ──
@@ -2029,6 +2101,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     if (id === 'prompts') loadSystemPrompts();
     if (id === 'p2p') { loadConversations(); startHeartbeat(); }
     if (id === 'agents') { loadAgentPage(); }
+    if (id === 'calllogs') { loadCallLogs(); }
   }
 
   // ── Has feature check (client-side) ──
@@ -6088,6 +6161,208 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     document.body.appendChild(card);
     var doneBtn = document.getElementById('callSummaryDoneBtn');
     if (doneBtn) doneBtn.onclick = function() { card.remove(); bg.remove(); };
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // ── Call Logs Page ──
+  // ══════════════════════════════════════════════════════════════════════════
+  var _callLogsData = [];
+  var _callLogsFilter = 'all';
+
+  async function loadCallLogs() {
+    var list = document.getElementById('callLogsList');
+    if (!list) return;
+    list.innerHTML = '<p style="text-align:center;color:var(--text3);padding:20px;">Loading call logs...</p>';
+
+    try {
+      var d = await api('GET', '/v1/agent-calls/admin/call-logs');
+      _callLogsData = d.logs || [];
+
+      // Update stats
+      document.getElementById('clStatTotal').textContent = _callLogsData.length;
+      document.getElementById('clStatPhone').textContent = _callLogsData.filter(function(c) { return c.source === 'phone'; }).length;
+      document.getElementById('clStatBrowser').textContent = _callLogsData.filter(function(c) { return c.source === 'browser'; }).length;
+      document.getElementById('clStatEscalated').textContent = _callLogsData.filter(function(c) { return c.status === 'escalated'; }).length;
+      document.getElementById('clStatActive').textContent = _callLogsData.filter(function(c) { return c.status === 'active'; }).length;
+
+      renderCallLogs();
+    } catch (e) {
+      list.innerHTML = '<p style="text-align:center;color:var(--red);padding:20px;">Failed to load call logs: ' + esc(e.message) + '</p>';
+    }
+  }
+
+  function filterCallLogs(filter) {
+    if (filter) _callLogsFilter = filter;
+    // Update active button style
+    document.querySelectorAll('.calllog-filter').forEach(function(btn) {
+      btn.classList.toggle('active', btn.getAttribute('data-filter') === _callLogsFilter);
+    });
+    renderCallLogs();
+  }
+
+  function renderCallLogs() {
+    var list = document.getElementById('callLogsList');
+    var search = (document.getElementById('callLogSearch')?.value || '').toLowerCase();
+    var filtered = _callLogsData.filter(function(c) {
+      // Filter by type
+      if (_callLogsFilter === 'phone' && c.source !== 'phone') return false;
+      if (_callLogsFilter === 'browser' && c.source !== 'browser') return false;
+      if (_callLogsFilter === 'escalated' && c.status !== 'escalated') return false;
+      if (_callLogsFilter === 'active' && c.status !== 'active') return false;
+      // Search
+      if (search) {
+        var hay = (c.agentName + ' ' + c.userName + ' ' + c.callerPhone + ' ' + c.summary + ' ' + c.source).toLowerCase();
+        if (hay.indexOf(search) === -1) return false;
+      }
+      return true;
+    });
+
+    if (filtered.length === 0) {
+      list.innerHTML = '<p style="text-align:center;color:var(--text3);padding:30px;">No calls match this filter.</p>';
+      return;
+    }
+
+    list.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:13px;">' +
+      '<thead><tr style="border-bottom:2px solid var(--border);text-align:left;">' +
+        '<th style="padding:8px 10px;font-size:11px;color:var(--text3);font-weight:600;">Agent</th>' +
+        '<th style="padding:8px 10px;font-size:11px;color:var(--text3);font-weight:600;">User / Phone</th>' +
+        '<th style="padding:8px 10px;font-size:11px;color:var(--text3);font-weight:600;">Source</th>' +
+        '<th style="padding:8px 10px;font-size:11px;color:var(--text3);font-weight:600;">Status</th>' +
+        '<th style="padding:8px 10px;font-size:11px;color:var(--text3);font-weight:600;">Duration</th>' +
+        '<th style="padding:8px 10px;font-size:11px;color:var(--text3);font-weight:600;">Messages</th>' +
+        '<th style="padding:8px 10px;font-size:11px;color:var(--text3);font-weight:600;">Date</th>' +
+        '<th style="padding:8px 10px;font-size:11px;color:var(--text3);font-weight:600;"></th>' +
+      '</tr></thead><tbody>' +
+      filtered.map(function(c, idx) {
+        var dur = c.durationSec >= 60 ? Math.floor(c.durationSec/60) + 'm ' + (c.durationSec%60) + 's' : c.durationSec + 's';
+        var statusColors = { active: '#22c55e', ended: '#6b7280', escalated: '#ef4444' };
+        var statusColor = statusColors[c.status] || '#6b7280';
+        var srcBg = c.source === 'phone' ? 'rgba(139,92,246,0.12)' : 'rgba(59,130,246,0.12)';
+        var srcColor = c.source === 'phone' ? '#8b5cf6' : '#3b82f6';
+        var srcLabel = c.source === 'phone' ? 'PHONE' : 'BROWSER';
+        var userLabel = c.source === 'phone' && c.callerPhone ? c.callerPhone : esc(c.userName || 'Unknown');
+
+        return '<tr style="border-bottom:1px solid var(--border);cursor:pointer;" onmouseover="this.style.background=\\'var(--surface2)\\'" onmouseout="this.style.background=\\'transparent\\'" onclick="viewCallDetail(' + idx + ')">' +
+          '<td style="padding:10px;">' +
+            '<div style="display:flex;align-items:center;gap:8px;">' +
+              '<span style="font-size:18px;">' + (c.agentAvatar || '?') + '</span>' +
+              '<div><div style="font-weight:600;">' + esc(c.agentName) + '</div><div style="font-size:10px;color:var(--text3);">' + esc(c.agentSpecialty || '') + '</div></div>' +
+            '</div>' +
+          '</td>' +
+          '<td style="padding:10px;font-size:12px;">' + userLabel + '</td>' +
+          '<td style="padding:10px;"><span style="font-size:9px;padding:2px 8px;border-radius:8px;font-weight:700;background:' + srcBg + ';color:' + srcColor + ';">' + srcLabel + '</span></td>' +
+          '<td style="padding:10px;"><span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:' + statusColor + ';">' +
+            (c.status === 'active' ? '<span style="width:6px;height:6px;border-radius:50%;background:#22c55e;animation:livePulse 1.5s infinite;"></span>' : '') +
+            c.status + '</span></td>' +
+          '<td style="padding:10px;font-size:12px;color:var(--text2);">' + dur + '</td>' +
+          '<td style="padding:10px;font-size:12px;color:var(--text2);">' + c.messageCount + '</td>' +
+          '<td style="padding:10px;font-size:11px;color:var(--text3);">' + new Date(c.startedAt).toLocaleString() + '</td>' +
+          '<td style="padding:10px;"><button class="btn-small" style="font-size:10px;padding:3px 10px;" onclick="event.stopPropagation();viewCallDetail(' + idx + ')">View</button></td>' +
+        '</tr>';
+      }).join('') +
+      '</tbody></table>';
+  }
+
+  function viewCallDetail(idx) {
+    var filtered = _callLogsData.filter(function(c) {
+      var search = (document.getElementById('callLogSearch')?.value || '').toLowerCase();
+      if (_callLogsFilter === 'phone' && c.source !== 'phone') return false;
+      if (_callLogsFilter === 'browser' && c.source !== 'browser') return false;
+      if (_callLogsFilter === 'escalated' && c.status !== 'escalated') return false;
+      if (_callLogsFilter === 'active' && c.status !== 'active') return false;
+      if (search) {
+        var hay = (c.agentName + ' ' + c.userName + ' ' + c.callerPhone + ' ' + c.summary + ' ' + c.source).toLowerCase();
+        if (hay.indexOf(search) === -1) return false;
+      }
+      return true;
+    });
+    var c = filtered[idx];
+    if (!c) return;
+
+    var dur = c.durationSec >= 60 ? Math.floor(c.durationSec/60) + 'm ' + (c.durationSec%60) + 's' : c.durationSec + 's';
+    var srcBadge = c.source === 'phone'
+      ? '<span style="font-size:10px;padding:2px 8px;border-radius:8px;font-weight:700;background:rgba(139,92,246,0.12);color:#8b5cf6;">PHONE</span>'
+      : '<span style="font-size:10px;padding:2px 8px;border-radius:8px;font-weight:700;background:rgba(59,130,246,0.12);color:#3b82f6;">BROWSER</span>';
+    var statusColors = { active: '#22c55e', ended: '#6b7280', escalated: '#ef4444' };
+
+    // Header
+    document.getElementById('callDetailHeader').innerHTML =
+      '<div style="display:flex;align-items:center;gap:14px;">' +
+        '<div style="font-size:36px;">' + (c.agentAvatar || '?') + '</div>' +
+        '<div style="flex:1;">' +
+          '<h3 style="font-size:18px;font-weight:700;margin:0;">' + esc(c.agentName) + ' <span style="font-size:13px;font-weight:400;color:var(--text3);">' + esc(c.agentSpecialty || '') + '</span></h3>' +
+          '<div style="display:flex;gap:8px;align-items:center;margin-top:4px;">' +
+            srcBadge +
+            '<span style="font-size:11px;font-weight:600;color:' + (statusColors[c.status] || '#6b7280') + ';">' + c.status.toUpperCase() + '</span>' +
+            '<span style="font-size:11px;color:var(--text3);">' + dur + ' &middot; ' + c.messageCount + ' messages</span>' +
+          '</div>' +
+          '<div style="font-size:11px;color:var(--text3);margin-top:4px;">' +
+            'User: ' + esc(c.userName || 'Unknown') +
+            (c.callerPhone ? ' &middot; Phone: ' + esc(c.callerPhone) : '') +
+            ' &middot; Started: ' + new Date(c.startedAt).toLocaleString() +
+            (c.endedAt ? ' &middot; Ended: ' + new Date(c.endedAt).toLocaleString() : '') +
+          '</div>' +
+        '</div>' +
+      '</div>';
+
+    // Summary
+    var summaryEl = document.getElementById('callDetailSummary');
+    if (c.summary) {
+      summaryEl.style.display = '';
+      summaryEl.innerHTML =
+        '<h4 style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;margin:0 0 6px;">Summary</h4>' +
+        '<p style="font-size:13px;color:var(--text);line-height:1.6;margin:0;">' + esc(c.summary) + '</p>';
+    } else {
+      summaryEl.style.display = '';
+      summaryEl.innerHTML = '<p style="font-size:12px;color:var(--text3);margin:0;">No summary available' + (c.status === 'active' ? ' (call still active)' : '') + '</p>';
+    }
+
+    // Transcript
+    var transcriptEl = document.getElementById('callDetailTranscript');
+    var msgs = (c.transcript || []);
+    if (msgs.length === 0) {
+      transcriptEl.innerHTML = '<p style="color:var(--text3);font-size:12px;">No transcript available.</p>';
+    } else {
+      transcriptEl.innerHTML = msgs.map(function(m) {
+        var isUser = m.role === 'user';
+        var isSystem = m.role === 'system';
+        var bgColor = isSystem ? 'rgba(239,68,68,0.08)' : (isUser ? 'rgba(99,102,241,0.08)' : 'var(--surface)');
+        var borderColor = isSystem ? 'rgba(239,68,68,0.2)' : (isUser ? 'rgba(99,102,241,0.2)' : 'var(--border)');
+        var label = isSystem ? 'SYSTEM' : (isUser ? (c.source === 'phone' ? 'CALLER' : 'USER') : c.agentName);
+        var labelColor = isSystem ? '#ef4444' : (isUser ? 'var(--accent)' : '#22c55e');
+        var time = m.timestamp ? new Date(m.timestamp).toLocaleTimeString() : '';
+
+        return '<div style="padding:10px 14px;margin-bottom:6px;border-radius:10px;background:' + bgColor + ';border:1px solid ' + borderColor + ';">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">' +
+            '<span style="font-size:10px;font-weight:700;color:' + labelColor + ';text-transform:uppercase;letter-spacing:0.5px;">' + esc(label) + '</span>' +
+            '<span style="font-size:9px;color:var(--text3);">' + time + '</span>' +
+          '</div>' +
+          '<div style="font-size:13px;color:var(--text);line-height:1.6;">' + esc(m.text) + '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    // Supervisor Notes
+    var supEl = document.getElementById('callDetailSupervisor');
+    if (c.supervisorNotes && c.supervisorNotes.length > 0) {
+      supEl.style.display = '';
+      supEl.innerHTML =
+        '<h4 style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;margin:0 0 8px;">Supervisor Analysis</h4>' +
+        c.supervisorNotes.map(function(n) {
+          var sevColors = { low: '#22c55e', medium: '#f59e0b', high: '#ef4444' };
+          return '<div style="padding:8px 12px;margin-bottom:4px;border-radius:8px;background:var(--surface);border:1px solid var(--border);font-size:12px;">' +
+            '<div style="display:flex;gap:6px;align-items:center;margin-bottom:2px;">' +
+              '<span style="font-weight:700;color:' + (sevColors[n.severity] || '#6b7280') + ';">' + (n.severity || 'unknown').toUpperCase() + '</span>' +
+              (n.escalationNeeded ? '<span style="color:#ef4444;font-weight:600;">ESCALATION NEEDED</span>' : '') +
+            '</div>' +
+            '<div style="color:var(--text2);">' + esc(n.reason || '') + '</div>' +
+          '</div>';
+        }).join('');
+    } else {
+      supEl.style.display = 'none';
+    }
+
+    document.getElementById('callDetailOverlay').style.display = '';
   }
 
   // ── Agent settings persistence ──

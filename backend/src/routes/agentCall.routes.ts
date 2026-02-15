@@ -930,6 +930,43 @@ export async function agentCallRoutes(app: FastifyInstance) {
     return { sessions };
   });
 
+  // ═══ GET /admin/call-logs — Admin: all calls with transcripts ═══════════════
+  app.get('/admin/call-logs', {
+    preHandler: [localAuthenticate, requirePermission('users.list')],
+  }, async () => {
+    const logs: any[] = [];
+
+    // Collect all sessions (active + ended)
+    for (const [, sess] of activeSessions) {
+      const agent = AGENTS.find(a => a.id === sess.agentId);
+      const duration = sess.endedAt
+        ? Math.floor((new Date(sess.endedAt).getTime() - new Date(sess.startedAt).getTime()) / 1000)
+        : Math.floor((Date.now() - new Date(sess.startedAt).getTime()) / 1000);
+      logs.push({
+        id: sess.id,
+        userId: sess.userId,
+        userName: sess.userName,
+        agentId: sess.agentId,
+        agentName: agent?.name || 'Unknown',
+        agentAvatar: agent?.avatar || '?',
+        agentSpecialty: agent?.specialty || '',
+        status: sess.status,
+        summary: sess.summary || '',
+        messageCount: sess.transcript.filter((t: any) => t.role !== 'system').length,
+        startedAt: sess.startedAt,
+        endedAt: sess.endedAt || '',
+        durationSec: duration,
+        source: sess.source || 'browser',
+        callerPhone: sess.callerPhone || '',
+        transcript: sess.transcript,
+        supervisorNotes: sess.supervisorNotes || [],
+      });
+    }
+
+    logs.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
+    return { logs };
+  });
+
   // ═══ GET /admin/active — Admin: view all active calls ═════════════════════
   app.get('/admin/active', {
     preHandler: [localAuthenticate, requirePermission('users.list')],
