@@ -4164,8 +4164,8 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
           return;
         }
         const sourceLabel = srcLang ? 'from ' + srcLang + ' ' : '';
-        const systemPrompt = 'You are a professional translator. Translate the given text accurately. Output ONLY the translated text, nothing else. No explanations, no notes, no quotes.';
-        const userMsg = 'Translate the following text ' + sourceLabel + 'to ' + tgtLang + ':\\n' + text;
+        const systemPrompt = 'You are a translator. Translate text and output ONLY the translation. Rules: 1) Output ONLY the translated sentence. 2) Do NOT add URLs, links, explanations, notes, or anything extra. 3) Do NOT repeat yourself. 4) Keep it short and accurate.';
+        const userMsg = 'Translate ' + sourceLabel + 'to ' + tgtLang + ': ' + text;
         const startTime = Date.now();
         try { await localEngine.resetChat(); } catch(rc) {}
         const reply = await localEngine.chat.completions.create({
@@ -4173,17 +4173,26 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userMsg },
           ],
-          temperature: 0.2,
-          max_tokens: 2048,
+          temperature: 0.1,
+          max_tokens: 256,
           stream: false,
+          stop: ['\\n\\n', 'Enlace', 'http', 'https', 'Link:', 'Note:', 'Explanation:'],
         });
-        const translated = reply.choices[0]?.message?.content?.trim() || '';
-        if (!translated) throw new Error('Model returned empty response. Try a larger model.');
+        var translated = reply.choices[0]?.message?.content?.trim() || '';
+        // Post-process: strip hallucinated URLs, repeated lines, and garbage
+        translated = translated.split('\\n').filter(function(line) {
+          if (line.match(/^(Enlace|Link|URL|http|Note|Explanation|Respuesta|Response)/i)) return false;
+          if (line.trim() === '') return false;
+          return true;
+        })[0] || translated.split('\\n')[0] || '';
+        translated = translated.replace(/https?:\\/\\/\\S+/g, '').trim();
+        if (!translated) throw new Error('Local model could not translate. Try a cloud provider (Groq is free) for better results.');
         const latency = Date.now() - startTime;
         document.getElementById('transResult').style.display = '';
         document.getElementById('transResultText').textContent = translated;
         document.getElementById('transResultMeta').innerHTML =
-          'Provider: <strong>Local LLM (WebLLM)</strong> | Offline | ' + latency + 'ms';
+          'Provider: <strong>Local LLM (WebLLM)</strong> | Offline | ' + latency + 'ms' +
+          '<br><span style="color:var(--text3);font-size:11px;">Tip: Small local models may produce poor translations. For best results, use Groq (free) or another cloud provider.</span>';
         toast('Translation complete (offline)!', 'ok');
       } else if (provider === 'kaggle') {
         // ── Kaggle / Ollama translation (via server, no API key) ──
@@ -4959,12 +4968,18 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
         try { await localEngine.resetChat(); } catch(rc) {}
         const reply = await localEngine.chat.completions.create({
           messages: [
-            { role: 'system', content: 'Translate the given text to English. Output ONLY the translated text, nothing else.' },
-            { role: 'user', content: text },
+            { role: 'system', content: 'You are a translator. Translate text to English. Output ONLY the translated sentence. No URLs, no links, no explanations, no repetition.' },
+            { role: 'user', content: 'Translate to English: ' + text },
           ],
-          temperature: 0.2, max_tokens: 1024, stream: false,
+          temperature: 0.1, max_tokens: 256, stream: false,
+          stop: ['\\n\\n', 'Enlace', 'http', 'https', 'Link:', 'Note:'],
         });
-        translatedText = reply.choices[0]?.message?.content?.trim() || '';
+        var rawTranslation = reply.choices[0]?.message?.content?.trim() || '';
+        // Strip hallucinated URLs and garbage lines
+        rawTranslation = rawTranslation.split('\\n').filter(function(l) {
+          return !l.match(/^(Enlace|Link|URL|http|Note|Explanation|Respuesta)/i) && l.trim();
+        })[0] || rawTranslation.split('\\n')[0] || '';
+        translatedText = rawTranslation.replace(/https?:\\/\\/\\S+/g, '').trim();
       } else {
         // Fall back to cloud or Kaggle API
         var provider = document.getElementById('voiceTransProvider')?.value || 'openai';
@@ -5426,12 +5441,17 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
         try { await localEngine.resetChat(); } catch(rc) {}
         const reply = await localEngine.chat.completions.create({
           messages: [
-            { role: 'system', content: 'Translate the given text to English. Output ONLY the translated text, nothing else. No explanations, no notes.' },
-            { role: 'user', content: text },
+            { role: 'system', content: 'You are a translator. Translate text to English. Output ONLY the translated sentence. No URLs, no links, no explanations, no repetition.' },
+            { role: 'user', content: 'Translate to English: ' + text },
           ],
-          temperature: 0.2, max_tokens: 2048, stream: false,
+          temperature: 0.1, max_tokens: 256, stream: false,
+          stop: ['\\n\\n', 'Enlace', 'http', 'https', 'Link:', 'Note:'],
         });
-        translated = reply.choices[0]?.message?.content?.trim() || 'No translation';
+        var rawGvTranslation = reply.choices[0]?.message?.content?.trim() || '';
+        rawGvTranslation = rawGvTranslation.split('\\n').filter(function(l) {
+          return !l.match(/^(Enlace|Link|URL|http|Note|Explanation|Respuesta)/i) && l.trim();
+        })[0] || rawGvTranslation.split('\\n')[0] || '';
+        translated = rawGvTranslation.replace(/https?:\\/\\/\\S+/g, '').trim() || 'No translation';
         document.getElementById('gvStatus').textContent = 'Translated (Local LLM, offline)';
       } else {
         var provider = document.getElementById('voiceTransProvider')?.value || 'openai';
