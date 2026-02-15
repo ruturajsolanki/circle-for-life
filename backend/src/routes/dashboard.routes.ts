@@ -3010,7 +3010,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     const kagglePanel = document.getElementById('kaggleChatPanel');
     const statusEl = document.getElementById('modelStatus');
 
-    if (prov === 'local') {
+    if (prov === 'local_llm' || prov === 'local') {
       if (!hasFeature('local_llm')) {
         toast('Local LLM unlocks at Level 3 — Creator', 'err');
         document.getElementById('chatProvider').value = '';
@@ -3106,7 +3106,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
   async function fetchModels() {
     const prov = document.getElementById('chatProvider').value;
     const key = document.getElementById('chatKey').value;
-    if (!prov || prov === 'local' || prov === 'kaggle' || !key) return;
+    if (!prov || prov === 'local_llm' || prov === 'local' || prov === 'kaggle' || !key) return;
 
     const statusEl = document.getElementById('modelStatus');
     const modelSel = document.getElementById('chatModel');
@@ -3245,11 +3245,15 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     btn.innerHTML = '<span class="spinner"></span>'; btn.disabled = true;
 
     try {
-      if (prov === 'local') {
+      if (prov === 'local_llm' || prov === 'local') {
         // ── Local LLM inference ──
         if (!localEngine || !localModelLoaded) { throw new Error('Load a local model first'); }
+        // Build messages with a system prompt for coherent conversation
+        var localMsgs = [
+          { role: 'system', content: 'You are a helpful, friendly AI assistant. Answer the user\\'s questions directly and conversationally. Be concise and relevant. Do not give generic chatbot advice unless specifically asked.' }
+        ].concat(chatHistory.map(m => ({ role: m.role, content: m.content })));
         const reply = await localEngine.chat.completions.create({
-          messages: chatHistory.map(m => ({ role: m.role, content: m.content })),
+          messages: localMsgs,
           max_tokens: 2048,
           temperature: 0.7,
           stream: false,
@@ -3551,7 +3555,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     const lastAiMsg = chatHistory.filter(m => m.role === 'assistant').pop();
 
     lastPlaygroundData = {
-      provider: prov === 'local' ? 'Local LLM' : prov,
+      provider: (prov === 'local_llm' || prov === 'local') ? 'Local LLM' : prov,
       model: model,
       prompt: lastUserMsg?.content || '',
       response: lastAiMsg?.content || '',
