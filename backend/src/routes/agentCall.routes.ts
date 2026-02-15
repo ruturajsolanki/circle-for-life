@@ -995,6 +995,119 @@ export async function agentCallRoutes(app: FastifyInstance) {
     return { activeCalls };
   });
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ═══ BLUEPRINT ROADMAP API ═════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  const ROADMAP_PHASES = [
+    {
+      id: 'phase1',
+      title: 'Phase 1: Foundation',
+      subtitle: 'Core platform with all essential features',
+      status: 'current',
+      items: [
+        'AI Chat Playground', 'Blog Platform', 'Gamification (Gems & Levels)',
+        'P2P Chat (Free for all)', 'AI Agent Call Center', 'Phone IVR System',
+        'Image Studio', 'Voice Lab', 'API Tester', 'Admin Dashboard',
+      ],
+    },
+    {
+      id: 'phase2',
+      title: 'Phase 2: Standalone Modules',
+      subtitle: 'Release features as independent tools with sign-up funnels',
+      status: 'planned',
+      items: [
+        'AI Chat as standalone web tool', 'Image Studio as standalone tool',
+        'Voice Lab as standalone tool', 'API Tester as standalone tool',
+        'AI Agent Demo page', '"Powered by Circle for Life" branding',
+      ],
+    },
+    {
+      id: 'phase3',
+      title: 'Phase 3: Mobile + Growth',
+      subtitle: 'Mobile apps, referral campaigns, user acquisition',
+      status: 'planned',
+      items: [
+        'Progressive Web App (PWA)', 'iOS App (App Store)',
+        'Android App (Play Store)', 'Referral campaign launch',
+        'Influencer partnerships', 'Product Hunt launch',
+        'SEO landing pages per feature',
+      ],
+    },
+    {
+      id: 'phase4',
+      title: 'Phase 4: Scale + Monetize',
+      subtitle: 'Premium features, enterprise offerings, marketplace',
+      status: 'planned',
+      items: [
+        'Premium subscription tiers', 'Enterprise API access',
+        'White-label module licensing', 'AI tools marketplace',
+        'Advanced analytics dashboard', 'Custom branding options',
+      ],
+    },
+  ];
+
+  const MODULES = [
+    { id: 'ai_chat', name: 'AI Chat Playground', standalone: true, status: 'built', priority: 'Release first', description: 'Multi-provider AI chat with local LLM support' },
+    { id: 'image_studio', name: 'Image Studio', standalone: true, status: 'built', priority: 'Release second', description: 'AI image generation with gallery and editing' },
+    { id: 'voice_lab', name: 'Voice Lab', standalone: true, status: 'built', priority: 'Release third', description: 'Text-to-speech, speech-to-text, and translation' },
+    { id: 'api_tester', name: 'API Tester', standalone: true, status: 'built', priority: 'Release fourth', description: 'Interactive REST API testing tool' },
+    { id: 'agent_calls', name: 'AI Agent Call Center', standalone: true, status: 'built', priority: 'High-impact demo', description: 'Voice AI agents with phone IVR and escalation' },
+    { id: 'p2p_chat', name: 'P2P Chat', standalone: false, status: 'built', priority: 'Core feature', description: 'Real-time peer-to-peer messaging with AI features' },
+    { id: 'blog', name: 'Blog Platform', standalone: true, status: 'built', priority: 'Content funnel', description: 'Publishing platform with comments, likes, and categories' },
+    { id: 'gem_economy', name: 'Gem Economy', standalone: false, status: 'built', priority: 'Retention engine', description: 'Gamification system with gems, levels, streaks, and leaderboards' },
+  ];
+
+  // In-memory milestone storage (persists across requests, resets on deploy)
+  const DEFAULT_MILESTONES = [
+    { id: 'ms_standalone_chat', title: 'Launch standalone AI Chat tool', status: 'planned', category: 'module' },
+    { id: 'ms_standalone_image', title: 'Launch standalone Image Studio', status: 'planned', category: 'module' },
+    { id: 'ms_standalone_voice', title: 'Launch standalone Voice Lab', status: 'planned', category: 'module' },
+    { id: 'ms_landing_page', title: 'Set up landing page with SEO', status: 'planned', category: 'growth' },
+    { id: 'ms_product_hunt', title: 'Submit to Product Hunt', status: 'planned', category: 'growth' },
+    { id: 'ms_100_users', title: 'Reach 100 users', status: 'planned', category: 'growth' },
+    { id: 'ms_1000_users', title: 'Reach 1,000 users', status: 'planned', category: 'growth' },
+    { id: 'ms_pwa', title: 'Launch Progressive Web App (PWA)', status: 'planned', category: 'mobile' },
+    { id: 'ms_app_store', title: 'Submit to App Store', status: 'planned', category: 'mobile' },
+    { id: 'ms_play_store', title: 'Submit to Play Store', status: 'planned', category: 'mobile' },
+    { id: 'ms_10k_downloads', title: 'Reach 10,000 downloads', status: 'planned', category: 'growth' },
+    { id: 'ms_referral', title: 'Launch referral campaign', status: 'planned', category: 'growth' },
+    { id: 'ms_enterprise', title: 'First enterprise client', status: 'planned', category: 'revenue' },
+    { id: 'ms_premium', title: 'Launch premium subscription', status: 'planned', category: 'revenue' },
+  ];
+
+  let milestones = [...DEFAULT_MILESTONES];
+
+  // GET /blueprint/roadmap — public (any authenticated user)
+  app.get('/blueprint/roadmap', {
+    preHandler: [localAuthenticate],
+  }, async () => {
+    return {
+      phases: ROADMAP_PHASES,
+      modules: MODULES,
+      milestones,
+    };
+  });
+
+  // PUT /blueprint/milestone/:id — super_admin only
+  app.put('/blueprint/milestone/:id', {
+    preHandler: [localAuthenticate, requirePermission('system.config')],
+  }, async (request: any, reply) => {
+    const { id } = request.params as any;
+    const body = request.body as any;
+    const ms = milestones.find(m => m.id === id);
+    if (!ms) return reply.status(404).send({ error: { message: 'Milestone not found' } });
+
+    const validStatuses = ['planned', 'in_progress', 'done', 'shipped'];
+    if (body.status && validStatuses.includes(body.status)) {
+      ms.status = body.status;
+    }
+    if (body.title) ms.title = body.title;
+
+    logger.info(`Blueprint milestone updated: ${id} → ${ms.status}`);
+    return { ok: true, milestone: ms };
+  });
+
   // ═══ GET /admin/platform-config — Read runtime config (super_admin only) ════
   app.get('/admin/platform-config', {
     preHandler: [localAuthenticate, requirePermission('system.config')],

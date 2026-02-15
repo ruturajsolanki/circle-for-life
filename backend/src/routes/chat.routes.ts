@@ -183,20 +183,9 @@ function detectScheduling(text: string): { detected: boolean; data: string } {
 
 export async function chatRoutes(app: FastifyInstance) {
 
-  function checkChatAccess(user: any): { allowed: boolean; message: string } {
-    if (user.role === 'admin' || user.role === 'super_admin') {
-      return { allowed: true, message: '' };
-    }
-    const gems = Number(user.totalGemsEarned) || 0;
-    const hasP2P = hasFeatureUnlock(gems, 'p2p_chat');
-    const hasPreview = hasFeatureUnlock(gems, 'p2p_preview');
-
-    if (hasP2P) return { allowed: true, message: '' };
-    if (hasPreview) return { allowed: true, message: 'preview' };
-    return {
-      allowed: false,
-      message: 'P2P Chat unlocks at Level 10 — Eternal. You need to earn more gems to access this feature!',
-    };
+  function checkChatAccess(_user: any): { allowed: boolean; message: string } {
+    // P2P Chat is now free for all users
+    return { allowed: true, message: '' };
   }
 
   // ═══ GET /conversations — List user's conversations ═════════════════════

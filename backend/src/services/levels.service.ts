@@ -39,7 +39,7 @@ export const LEVELS: LevelDef[] = [
       '5 AI generations per day',
       'Standard voting',
     ],
-    unlocks: ['feed', 'chat_basic', 'profile'],
+    unlocks: ['feed', 'chat_basic', 'profile', 'p2p_preview', 'p2p_chat'],
     dailyGenLimit: 5,
     voteMultiplier: 1.0,
     badge: 'Newcomer',
@@ -302,5 +302,5 @@ export const SECTION_REQUIREMENTS: Record<string, { feature: string; minLevel: n
   users:     { feature: 'user_management', minLevel: 6,  label: 'User Management' },
   audit:     { feature: 'audit_log',       minLevel: 6,  label: 'Audit Log' },
   prompts:   { feature: 'system_config',   minLevel: 8,  label: 'System Prompts' },
-  p2p_chat:  { feature: 'p2p_chat',        minLevel: 10, label: 'P2P Chat' },
+  p2p_chat:  { feature: 'p2p_chat',        minLevel: 1,  label: 'P2P Chat' },
 };

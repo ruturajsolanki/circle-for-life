@@ -273,6 +273,56 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     .btn-icon { background:none; border:none; cursor:pointer; color:var(--text2); padding:6px; border-radius:6px; }
     .btn-icon:hover { background:var(--surface2); color:var(--accent); }
 
+    /* ── Blueprint Page ───────────────────────────────── */
+    .bp-hero { text-align:center; padding:40px 24px; background:linear-gradient(135deg, rgba(99,102,241,0.08), rgba(168,85,247,0.08)); border:1px solid var(--border); border-radius:16px; margin-bottom:32px; }
+    .bp-hero-badge { display:inline-block; padding:4px 16px; background:var(--accent); color:#fff; border-radius:999px; font-size:0.7rem; font-weight:700; letter-spacing:2px; margin-bottom:12px; }
+    .bp-hero-tagline { font-size:1.6rem; font-weight:800; margin:0 0 12px; background:linear-gradient(135deg,var(--accent),#a855f7); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+    .bp-hero-pitch { max-width:620px; margin:0 auto 20px; color:var(--text2); line-height:1.6; }
+    .bp-hero-actions { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
+    .bp-section-title { font-size:1.15rem; font-weight:700; margin:32px 0 16px; padding-bottom:8px; border-bottom:2px solid var(--accent); display:inline-block; }
+    .bp-growth-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:16px; margin-bottom:24px; }
+    .bp-card { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:20px; transition:all 0.2s; }
+    .bp-card:hover { border-color:var(--accent); transform:translateY(-2px); box-shadow:0 8px 24px rgba(99,102,241,0.1); }
+    .bp-card-icon { font-size:1.8rem; margin-bottom:8px; }
+    .bp-card h4 { margin:0 0 6px; font-weight:700; }
+    .bp-card p { margin:0; color:var(--text2); font-size:0.85rem; line-height:1.5; }
+    .bp-timeline { display:flex; gap:0; overflow-x:auto; padding-bottom:12px; margin-bottom:24px; }
+    .bp-phase { flex:1; min-width:220px; position:relative; padding:20px; border:1px solid var(--border); border-radius:14px; background:var(--surface); margin-right:12px; }
+    .bp-phase:last-child { margin-right:0; }
+    .bp-phase.current { border-color:var(--accent); background:linear-gradient(135deg,rgba(99,102,241,0.06),rgba(168,85,247,0.06)); }
+    .bp-phase-badge { display:inline-block; padding:2px 10px; border-radius:99px; font-size:0.65rem; font-weight:700; letter-spacing:1px; margin-bottom:8px; }
+    .bp-phase.current .bp-phase-badge { background:var(--accent); color:#fff; }
+    .bp-phase.planned .bp-phase-badge { background:var(--surface2); color:var(--text2); }
+    .bp-phase h4 { margin:0 0 4px; font-weight:700; font-size:0.95rem; }
+    .bp-phase .bp-phase-sub { margin:0 0 10px; color:var(--text2); font-size:0.78rem; }
+    .bp-phase ul { margin:0; padding-left:18px; }
+    .bp-phase li { font-size:0.78rem; color:var(--text2); margin-bottom:3px; }
+    .bp-table-wrap { overflow-x:auto; margin-bottom:24px; }
+    .bp-table { width:100%; border-collapse:collapse; background:var(--surface); border:1px solid var(--border); border-radius:14px; overflow:hidden; }
+    .bp-table th { text-align:left; padding:12px 14px; font-size:0.75rem; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:var(--text2); background:var(--surface2); border-bottom:1px solid var(--border); }
+    .bp-table td { padding:12px 14px; font-size:0.85rem; border-bottom:1px solid var(--border); }
+    .bp-table tr:last-child td { border-bottom:none; }
+    .bp-status-badge { display:inline-block; padding:2px 10px; border-radius:99px; font-size:0.7rem; font-weight:600; }
+    .bp-status-built { background:rgba(34,197,94,0.1); color:#22c55e; }
+    .bp-status-planned { background:rgba(99,102,241,0.1); color:var(--accent); }
+    .bp-status-in_progress { background:rgba(245,158,11,0.1); color:#f59e0b; }
+    .bp-status-done { background:rgba(34,197,94,0.15); color:#16a34a; }
+    .bp-status-shipped { background:rgba(99,102,241,0.15); color:#6366f1; }
+    .bp-milestones { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:12px; margin-bottom:24px; }
+    .bp-ms-card { display:flex; align-items:center; gap:12px; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:14px 16px; transition:all 0.2s; }
+    .bp-ms-card:hover { border-color:var(--accent); }
+    .bp-ms-icon { font-size:1.2rem; flex-shrink:0; }
+    .bp-ms-info { flex:1; min-width:0; }
+    .bp-ms-title { font-weight:600; font-size:0.88rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .bp-ms-cat { font-size:0.7rem; color:var(--text2); text-transform:uppercase; letter-spacing:0.5px; }
+    .bp-ms-select { padding:4px 8px; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--text1); font-size:0.78rem; cursor:pointer; }
+    .bp-ms-select:focus { border-color:var(--accent); outline:none; }
+    .bp-copy-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:12px; margin-bottom:24px; }
+    .bp-copy-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:16px; position:relative; }
+    .bp-copy-label { font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:var(--accent); margin-bottom:6px; }
+    .bp-copy-text { font-size:0.85rem; color:var(--text1); line-height:1.5; margin-bottom:10px; }
+    .bp-copy-btn { position:absolute; top:12px; right:12px; font-size:0.7rem; }
+
     /* Nav locked state */
     .nav-item.locked { opacity: 0.35; }
     .nav-item.locked:hover { opacity: 0.5; }
@@ -1694,6 +1744,139 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
       </div>
     </div>
 
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- BLUEPRINT PAGE                                             -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <div class="page" id="p-blueprint" style="display:none">
+      <div class="page-header">
+        <h2 class="page-title">Blueprint &amp; Growth Roadmap</h2>
+        <p class="page-subtitle">Your AI-Powered Social Universe — strategy, milestones, and the path to scale</p>
+      </div>
+
+      <!-- Section A: Hero / Vision -->
+      <div class="bp-hero">
+        <div class="bp-hero-badge">CIRCLE FOR LIFE</div>
+        <h3 class="bp-hero-tagline">Your AI-Powered Social Universe</h3>
+        <p class="bp-hero-pitch">Circle for Life combines social networking, AI tools, and gamification into one platform. Chat with AI, generate images, make voice translations, call AI agents — all while earning gems and leveling up.</p>
+        <div class="bp-hero-actions">
+          <button class="btn-primary" onclick="navigator.clipboard.writeText(window.location.origin).then(()=>showToast('Link copied!'))">Copy Share Link</button>
+          <button class="btn-small" onclick="window.open('https://twitter.com/intent/tweet?text='+encodeURIComponent('Check out Circle for Life — the AI-powered social platform! '+window.location.origin),'_blank')">Share on X</button>
+        </div>
+      </div>
+
+      <!-- Section B: Growth Strategy Cards -->
+      <h3 class="bp-section-title">Growth Strategy</h3>
+      <div class="bp-growth-grid" id="blueprintGrowthCards">
+        <div class="bp-card">
+          <div class="bp-card-icon">📦</div>
+          <h4>Standalone Modules</h4>
+          <p>Release features as independent micro-apps (Image Studio, Voice Lab, AI Chat, API Tester) that funnel users to the main platform.</p>
+        </div>
+        <div class="bp-card">
+          <div class="bp-card-icon">🔗</div>
+          <h4>Referral Engine</h4>
+          <p>Leverage the built-in referral system — share-to-unlock rewards, referral leaderboard, and viral invite mechanics.</p>
+        </div>
+        <div class="bp-card">
+          <div class="bp-card-icon">📝</div>
+          <h4>Content Marketing</h4>
+          <p>Blog posts, AI-generated showcases, social media templates, and feature highlight reels to attract organic users.</p>
+        </div>
+        <div class="bp-card">
+          <div class="bp-card-icon">🎮</div>
+          <h4>Community Hooks</h4>
+          <p>Gamification (gems, levels, streaks), daily check-ins, streak rewards, and the gem economy to drive retention.</p>
+        </div>
+        <div class="bp-card">
+          <div class="bp-card-icon">👨‍💻</div>
+          <h4>Developer Outreach</h4>
+          <p>Open API, SDK, embed widgets, and the Kaggle + Ollama integration story for the developer community.</p>
+        </div>
+        <div class="bp-card">
+          <div class="bp-card-icon">📱</div>
+          <h4>Mobile Launch</h4>
+          <p>PWA first for instant mobile access, then native iOS/Android via React Native or Flutter for app store presence.</p>
+        </div>
+        <div class="bp-card">
+          <div class="bp-card-icon">🤝</div>
+          <h4>Partnerships</h4>
+          <p>EdTech platforms, AI communities, hackathon sponsorships, and student developer programs for acquisition.</p>
+        </div>
+        <div class="bp-card">
+          <div class="bp-card-icon">🔍</div>
+          <h4>SEO / ASO</h4>
+          <p>App store optimization, SEO landing pages per feature, keyword targeting, and structured data for discoverability.</p>
+        </div>
+      </div>
+
+      <!-- Section C: Visual Roadmap (Timeline) -->
+      <h3 class="bp-section-title">Roadmap</h3>
+      <div class="bp-timeline" id="blueprintTimeline"></div>
+
+      <!-- Section D: Module Release Plan -->
+      <h3 class="bp-section-title">Module Release Plan</h3>
+      <div class="bp-table-wrap">
+        <table class="bp-table" id="blueprintModuleTable">
+          <thead>
+            <tr><th>Module</th><th>Standalone?</th><th>Status</th><th>Priority</th><th>Description</th></tr>
+          </thead>
+          <tbody id="blueprintModuleBody"></tbody>
+        </table>
+      </div>
+
+      <!-- Section E: Trackable Milestones -->
+      <h3 class="bp-section-title">Milestones</h3>
+      <p style="color:var(--text2);margin-bottom:16px;">Track progress toward key goals. Admins can update status directly.</p>
+      <div class="bp-milestones" id="blueprintMilestones"></div>
+
+      <!-- Section F: Punchlines + Marketing Copy -->
+      <h3 class="bp-section-title">Marketing Copy &amp; Punchlines</h3>
+      <div class="bp-copy-grid">
+        <div class="bp-copy-card">
+          <div class="bp-copy-label">Tagline</div>
+          <div class="bp-copy-text">"Your AI-Powered Social Universe"</div>
+          <button class="btn-small bp-copy-btn" onclick="navigator.clipboard.writeText('Your AI-Powered Social Universe').then(()=>showToast('Copied!'))">Copy</button>
+        </div>
+        <div class="bp-copy-card">
+          <div class="bp-copy-label">Elevator Pitch</div>
+          <div class="bp-copy-text">"Circle for Life combines social networking, AI tools, and gamification into one platform. Chat with AI, generate images, make voice translations, call AI agents — all while earning gems and leveling up."</div>
+          <button class="btn-small bp-copy-btn" onclick="navigator.clipboard.writeText('Circle for Life combines social networking, AI tools, and gamification into one platform. Chat with AI, generate images, make voice translations, call AI agents — all while earning gems and leveling up.').then(()=>showToast('Copied!'))">Copy</button>
+        </div>
+        <div class="bp-copy-card">
+          <div class="bp-copy-label">AI Chat Playground</div>
+          <div class="bp-copy-text">"Talk to any AI model — cloud or local — in one beautiful interface."</div>
+          <button class="btn-small bp-copy-btn" onclick="navigator.clipboard.writeText('Talk to any AI model — cloud or local — in one beautiful interface.').then(()=>showToast('Copied!'))">Copy</button>
+        </div>
+        <div class="bp-copy-card">
+          <div class="bp-copy-label">Image Studio</div>
+          <div class="bp-copy-text">"Generate stunning AI art and manage your creations in a personal gallery."</div>
+          <button class="btn-small bp-copy-btn" onclick="navigator.clipboard.writeText('Generate stunning AI art and manage your creations in a personal gallery.').then(()=>showToast('Copied!'))">Copy</button>
+        </div>
+        <div class="bp-copy-card">
+          <div class="bp-copy-label">Voice Lab</div>
+          <div class="bp-copy-text">"Speak, translate, and listen — AI-powered voice tools at your fingertips."</div>
+          <button class="btn-small bp-copy-btn" onclick="navigator.clipboard.writeText('Speak, translate, and listen — AI-powered voice tools at your fingertips.').then(()=>showToast('Copied!'))">Copy</button>
+        </div>
+        <div class="bp-copy-card">
+          <div class="bp-copy-label">AI Agent Call Center</div>
+          <div class="bp-copy-text">"Call an AI agent by voice — or let it call you. The future of customer support."</div>
+          <button class="btn-small bp-copy-btn" onclick="navigator.clipboard.writeText('Call an AI agent by voice — or let it call you. The future of customer support.').then(()=>showToast('Copied!'))">Copy</button>
+        </div>
+        <div class="bp-copy-card">
+          <div class="bp-copy-label">Social Post Template</div>
+          <div class="bp-copy-text">"Just discovered @CircleForLife — AI chat, image gen, voice tools, and a gem economy all in one platform. This is the future! 🚀 #AI #CircleForLife"</div>
+          <button class="btn-small bp-copy-btn" onclick="navigator.clipboard.writeText('Just discovered @CircleForLife — AI chat, image gen, voice tools, and a gem economy all in one platform. This is the future! 🚀 #AI #CircleForLife').then(()=>showToast('Copied!'))">Copy</button>
+        </div>
+        <div class="bp-copy-card">
+          <div class="bp-copy-label">Launch Announcement</div>
+          <div class="bp-copy-text">"We just launched Circle for Life — a free AI-powered social platform with chat, image gen, voice AI, phone agents, and gamification. Try it now!"</div>
+          <button class="btn-small bp-copy-btn" onclick="navigator.clipboard.writeText('We just launched Circle for Life — a free AI-powered social platform with chat, image gen, voice AI, phone agents, and gamification. Try it now!').then(()=>showToast('Copied!'))">Copy</button>
+        </div>
+      </div>
+
+    </div>
+    <!-- END BLUEPRINT PAGE -->
+
   </div>
 </div>
 
@@ -1887,9 +2070,10 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     { id: 'users', label: 'Users', minLevel: 6, feature: 'user_management', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>' },
     { id: 'audit', label: 'Audit Log', minLevel: 6, feature: 'audit_log', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>' },
     { id: 'prompts', label: 'System Prompts', minLevel: 8, feature: 'system_config', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>' },
-    { id: 'p2p', label: 'P2P Chat', minLevel: 10, feature: 'p2p_chat', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h8"/><circle cx="19" cy="5" r="3"/></svg>' },
+    { id: 'p2p', label: 'P2P Chat', minLevel: 1, feature: 'p2p_chat', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h8"/><circle cx="19" cy="5" r="3"/></svg>' },
     { id: 'agents', label: 'AI Agents', minLevel: 3, feature: 'ai_agents', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/></svg>' },
     { id: 'calllogs', label: 'Call Logs', minLevel: 6, feature: 'full_admin', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10,9 9,9 8,9"/></svg>' },
+    { id: 'blueprint', label: 'Blueprint', minLevel: 1, feature: 'feed', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>' },
   ];
 
   // ── Init ──
@@ -2102,6 +2286,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     if (id === 'p2p') { loadConversations(); startHeartbeat(); }
     if (id === 'agents') { loadAgentPage(); }
     if (id === 'calllogs') { loadCallLogs(); }
+    if (id === 'blueprint') { loadBlueprint(); }
   }
 
   // ── Has feature check (client-side) ──
@@ -6363,6 +6548,94 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     }
 
     document.getElementById('callDetailOverlay').style.display = '';
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ═══ BLUEPRINT PAGE JS ═════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  var _blueprintData = null;
+
+  async function loadBlueprint() {
+    try {
+      var res = await api('GET', '/v1/agent-calls/blueprint/roadmap');
+      if (res && res.phases) {
+        _blueprintData = res;
+        renderBlueprintTimeline(res.phases);
+        renderBlueprintModules(res.modules);
+        renderBlueprintMilestones(res.milestones);
+      }
+    } catch(e) {
+      console.error('Blueprint load error:', e);
+    }
+  }
+
+  function renderBlueprintTimeline(phases) {
+    var el = document.getElementById('blueprintTimeline');
+    if (!el) return;
+    el.innerHTML = phases.map(function(p) {
+      var cls = 'bp-phase ' + (p.status || 'planned');
+      var badgeText = p.status === 'current' ? 'CURRENT' : 'PLANNED';
+      return '<div class="' + cls + '">' +
+        '<span class="bp-phase-badge">' + badgeText + '</span>' +
+        '<h4>' + esc(p.title) + '</h4>' +
+        '<p class="bp-phase-sub">' + esc(p.subtitle) + '</p>' +
+        '<ul>' + p.items.map(function(item) { return '<li>' + esc(item) + '</li>'; }).join('') + '</ul>' +
+      '</div>';
+    }).join('');
+  }
+
+  function renderBlueprintModules(modules) {
+    var el = document.getElementById('blueprintModuleBody');
+    if (!el) return;
+    el.innerHTML = modules.map(function(m) {
+      return '<tr>' +
+        '<td style="font-weight:600;">' + esc(m.name) + '</td>' +
+        '<td>' + (m.standalone ? '<span style="color:#22c55e;font-weight:600;">Yes</span>' : '<span style="color:var(--text2);">No (core)</span>') + '</td>' +
+        '<td><span class="bp-status-badge bp-status-' + m.status + '">' + m.status.toUpperCase() + '</span></td>' +
+        '<td>' + esc(m.priority) + '</td>' +
+        '<td style="color:var(--text2);font-size:0.8rem;">' + esc(m.description) + '</td>' +
+      '</tr>';
+    }).join('');
+  }
+
+  function renderBlueprintMilestones(milestones) {
+    var el = document.getElementById('blueprintMilestones');
+    if (!el) return;
+    var isAdmin = user && (user.role === 'admin' || user.role === 'super_admin');
+    var statusIcons = { planned: '⬜', in_progress: '🔶', done: '✅', shipped: '🚀' };
+    el.innerHTML = milestones.map(function(ms, idx) {
+      var icon = statusIcons[ms.status] || '⬜';
+      var selectHtml = '';
+      if (isAdmin) {
+        selectHtml = '<select class="bp-ms-select" onchange="updateMilestone(\\''+ms.id+'\\', this.value)">' +
+          ['planned','in_progress','done','shipped'].map(function(s) {
+            return '<option value="'+s+'"'+(ms.status===s?' selected':'')+'>'+s.replace('_',' ').toUpperCase()+'</option>';
+          }).join('') +
+        '</select>';
+      } else {
+        selectHtml = '<span class="bp-status-badge bp-status-' + ms.status + '">' + ms.status.replace('_',' ').toUpperCase() + '</span>';
+      }
+      return '<div class="bp-ms-card">' +
+        '<div class="bp-ms-icon">' + icon + '</div>' +
+        '<div class="bp-ms-info">' +
+          '<div class="bp-ms-title">' + esc(ms.title) + '</div>' +
+          '<div class="bp-ms-cat">' + esc(ms.category) + '</div>' +
+        '</div>' +
+        selectHtml +
+      '</div>';
+    }).join('');
+  }
+
+  async function updateMilestone(id, status) {
+    try {
+      await api('PUT', '/v1/agent-calls/blueprint/milestone/' + id, { status: status });
+      showToast('Milestone updated!');
+      loadBlueprint();
+    } catch(e) {
+      showToast('Failed to update milestone');
+      console.error('Milestone update error:', e);
+    }
   }
 
   // ── Agent settings persistence ──
