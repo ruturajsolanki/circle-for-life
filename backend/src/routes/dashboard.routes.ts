@@ -901,6 +901,9 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
               <option value="openrouter">OpenRouter</option>
               <option value="together">Together AI</option>
             </optgroup>
+            <optgroup label="Self-Hosted">
+              <option value="kaggle">Kaggle / Ollama (Free GPU)</option>
+            </optgroup>
           </select>
           <!-- API key (hidden for local) -->
           <input type="password" id="chatKey" placeholder="API Key" style="display:none" oninput="onApiKeyInput()">
@@ -909,6 +912,15 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
             <option value="">Enter API key to load models...</option>
           </select>
           <span id="modelStatus" style="font-size:11px;color:var(--text3);white-space:nowrap;"></span>
+        </div>
+
+        <!-- Kaggle / Ollama URL (shown when kaggle is selected) -->
+        <div id="kaggleChatPanel" style="display:none;padding:0 0 8px;">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <input type="text" id="chatKaggleUrl" placeholder="Kaggle ngrok URL (e.g. https://xxxx.ngrok-free.app)" style="flex:1;min-width:280px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;" oninput="saveChatSettings()">
+            <button class="btn-small" onclick="fetchKaggleChatModels()" id="kaggleFetchBtn">Fetch Models</button>
+            <span style="font-size:11px;color:var(--text3);">No API key needed — uses your Kaggle Ollama notebook</span>
+          </div>
         </div>
 
         <!-- Local LLM Controls (shown when local is selected) -->
@@ -1244,6 +1256,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
               <label>LLM Provider</label>
               <select class="form-input" id="voiceTransProvider" onchange="onTransProviderChange()">
                 <option value="local_llm">Local LLM (WebLLM — Offline)</option>
+                <option value="kaggle">Kaggle / Ollama (Free GPU)</option>
                 <option value="openai">OpenAI</option>
                 <option value="anthropic">Anthropic</option>
                 <option value="google">Google Gemini</option>
@@ -1255,6 +1268,10 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
             <div class="form-group" id="voiceTransKeyGroup" style="flex:1;min-width:150px;display:none;">
               <label>API Key</label>
               <input type="password" class="form-input" id="voiceTransKey" placeholder="API key for translation...">
+            </div>
+            <div id="kaggleTransPanel" style="flex:1;min-width:200px;display:none;">
+              <label style="font-size:11px;color:var(--text3);">Kaggle ngrok URL</label>
+              <input type="text" class="form-input" id="voiceKaggleUrl" placeholder="https://xxxx.ngrok-free.app" oninput="saveVoiceSettings()">
             </div>
             <div id="localLlmTransHint" style="flex:1;min-width:150px;display:flex;align-items:center;">
               <span id="localLlmTransStatus" style="font-size:12px;color:var(--text3);">Load a local model in AI Chat first, then translate here for free.</span>
@@ -2184,6 +2201,10 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     renderSidebar();
     nav('overview');
 
+    // Restore saved chat/voice settings
+    loadChatSettings();
+    loadVoiceSettings();
+
     // Start global heartbeat + incoming call polling so calls work from any page
     startHeartbeat();
     startGlobalCallPolling();
@@ -2986,6 +3007,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     const keyInput = document.getElementById('chatKey');
     const modelSel = document.getElementById('chatModel');
     const localPanel = document.getElementById('localLlmPanel');
+    const kagglePanel = document.getElementById('kaggleChatPanel');
     const statusEl = document.getElementById('modelStatus');
 
     if (prov === 'local') {
@@ -2997,16 +3019,29 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
       keyInput.style.display = 'none';
       modelSel.style.display = 'none';
       localPanel.style.display = '';
+      kagglePanel.style.display = 'none';
       statusEl.textContent = 'Local LLM — runs in your browser via WebGPU';
+    } else if (prov === 'kaggle') {
+      keyInput.style.display = 'none';
+      modelSel.style.display = '';
+      localPanel.style.display = 'none';
+      kagglePanel.style.display = '';
+      statusEl.textContent = 'Kaggle Ollama — free GPU-powered LLM';
+      modelSel.innerHTML = '<option value="llama3.2:3b">llama3.2:3b</option><option value="llama3.1:8b">llama3.1:8b</option><option value="mistral:7b">mistral:7b</option><option value="phi3:mini">phi3:mini</option><option value="gemma2:2b">gemma2:2b</option><option value="qwen2.5:7b">qwen2.5:7b</option>';
+      // Auto-fetch live models if URL is set
+      var kagUrl = document.getElementById('chatKaggleUrl').value;
+      if (kagUrl) fetchKaggleChatModels();
     } else {
       keyInput.style.display = '';
       modelSel.style.display = '';
       localPanel.style.display = 'none';
+      kagglePanel.style.display = 'none';
       statusEl.textContent = '';
       modelSel.innerHTML = '<option value="">Enter API key to load models...</option>';
       // If key already has value, try fetching
       if (keyInput.value.length > 5) onApiKeyInput();
     }
+    saveChatSettings();
   }
 
   function onApiKeyInput() {
@@ -3015,12 +3050,63 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     if (key.length < 5) return;
     // Debounce 800ms
     modelFetchTimer = setTimeout(() => fetchModels(), 800);
+    saveChatSettings();
+  }
+
+  async function fetchKaggleChatModels() {
+    var kaggleUrl = document.getElementById('chatKaggleUrl').value;
+    if (!kaggleUrl) { toast('Enter your Kaggle ngrok URL first', 'err'); return; }
+    var modelSel = document.getElementById('chatModel');
+    var statusEl = document.getElementById('modelStatus');
+    statusEl.innerHTML = '<span class="spinner"></span> Fetching Kaggle models...';
+    try {
+      var d = await api('POST', '/v1/control-panel/models', { provider: 'kaggle', apiKey: 'ollama' });
+      if (d.models && d.models.length > 0) {
+        modelSel.innerHTML = d.models.map(function(m) { return '<option value="'+m.id+'">'+esc(m.name)+'</option>'; }).join('');
+        statusEl.textContent = d.source === 'live' ? 'Live models from Kaggle' : 'Fallback model list';
+      } else {
+        statusEl.textContent = 'No models found — using defaults';
+      }
+    } catch(e) {
+      statusEl.textContent = 'Could not fetch — using default models';
+    }
+    saveChatSettings();
+  }
+
+  // ── Chat settings persistence ──
+  function saveChatSettings() {
+    try {
+      localStorage.setItem('cfl_chat_settings', JSON.stringify({
+        provider: document.getElementById('chatProvider').value,
+        apiKey: document.getElementById('chatKey').value,
+        model: document.getElementById('chatModel').value,
+        kaggleUrl: document.getElementById('chatKaggleUrl').value,
+      }));
+    } catch(e) {}
+  }
+
+  function loadChatSettings() {
+    try {
+      var saved = JSON.parse(localStorage.getItem('cfl_chat_settings') || '{}');
+      if (saved.provider) {
+        document.getElementById('chatProvider').value = saved.provider;
+      }
+      if (saved.apiKey) document.getElementById('chatKey').value = saved.apiKey;
+      if (saved.kaggleUrl) document.getElementById('chatKaggleUrl').value = saved.kaggleUrl;
+      if (saved.provider) onProviderChange();
+      if (saved.model) {
+        setTimeout(function() {
+          var sel = document.getElementById('chatModel');
+          if (sel) { var opt = sel.querySelector('option[value="'+saved.model+'"]'); if (opt) sel.value = saved.model; }
+        }, 1500);
+      }
+    } catch(e) {}
   }
 
   async function fetchModels() {
     const prov = document.getElementById('chatProvider').value;
     const key = document.getElementById('chatKey').value;
-    if (!prov || prov === 'local' || !key) return;
+    if (!prov || prov === 'local' || prov === 'kaggle' || !key) return;
 
     const statusEl = document.getElementById('modelStatus');
     const modelSel = document.getElementById('chatModel');
@@ -3170,6 +3256,16 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
         });
         const content = reply.choices?.[0]?.message?.content || '';
         chatHistory.push({ role: 'assistant', content });
+      } else if (prov === 'kaggle') {
+        // ── Kaggle / Ollama ──
+        var kaggleUrl = document.getElementById('chatKaggleUrl').value;
+        if (!kaggleUrl) { throw new Error('Enter your Kaggle ngrok URL'); }
+        var model = document.getElementById('chatModel').value || 'llama3.2:3b';
+        var d = await api('POST', '/v1/control-panel/chat', {
+          provider: 'kaggle', model: model, apiKey: 'ollama', baseUrl: kaggleUrl,
+          messages: chatHistory, maxTokens: 2048,
+        });
+        chatHistory.push({ role: 'assistant', content: d.content });
       } else {
         // ── Cloud provider ──
         const key = document.getElementById('chatKey').value;
@@ -4007,7 +4103,9 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
   function onTransProviderChange() {
     const provider = document.getElementById('voiceTransProvider').value;
     const isLocal = provider === 'local_llm';
-    document.getElementById('voiceTransKeyGroup').style.display = isLocal ? 'none' : '';
+    const isKaggle = provider === 'kaggle';
+    document.getElementById('voiceTransKeyGroup').style.display = (isLocal || isKaggle) ? 'none' : '';
+    document.getElementById('kaggleTransPanel').style.display = isKaggle ? '' : 'none';
     document.getElementById('localLlmTransHint').style.display = isLocal ? 'flex' : 'none';
     if (isLocal) {
       const status = document.getElementById('localLlmTransStatus');
@@ -4017,6 +4115,28 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
         status.innerHTML = '<span style="color:var(--orange);">&#9888; No local model loaded.</span> Go to <a href="#" onclick="nav(&quot;chat&quot;);return false;" style="color:var(--accent);">AI Chat</a> → select "Local LLM" provider → Download & Load a model. Then come back here.';
       }
     }
+    saveVoiceSettings();
+  }
+
+  // ── Voice settings persistence ──
+  function saveVoiceSettings() {
+    try {
+      localStorage.setItem('cfl_voice_settings', JSON.stringify({
+        provider: document.getElementById('voiceTransProvider').value,
+        apiKey: document.getElementById('voiceTransKey').value,
+        kaggleUrl: document.getElementById('voiceKaggleUrl').value,
+      }));
+    } catch(e) {}
+  }
+
+  function loadVoiceSettings() {
+    try {
+      var saved = JSON.parse(localStorage.getItem('cfl_voice_settings') || '{}');
+      if (saved.provider) document.getElementById('voiceTransProvider').value = saved.provider;
+      if (saved.apiKey) document.getElementById('voiceTransKey').value = saved.apiKey;
+      if (saved.kaggleUrl) document.getElementById('voiceKaggleUrl').value = saved.kaggleUrl;
+      if (saved.provider) onTransProviderChange();
+    } catch(e) {}
   }
 
   async function doTranslate() {
@@ -4061,6 +4181,20 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
         document.getElementById('transResultMeta').innerHTML =
           'Provider: <strong>Local LLM (WebLLM)</strong> | Offline | ' + latency + 'ms';
         toast('Translation complete (offline)!', 'ok');
+      } else if (provider === 'kaggle') {
+        // ── Kaggle / Ollama translation (via server, no API key) ──
+        var kaggleUrl = document.getElementById('voiceKaggleUrl').value.trim();
+        if (!kaggleUrl) { toast('Enter your Kaggle ngrok URL', 'err'); btn.innerHTML = 'Translate'; btn.disabled = false; return; }
+        var d = await api('POST', '/v1/translate/text', {
+          text, sourceLang: srcLang, targetLang: tgtLang, provider: 'kaggle', apiKey: 'ollama',
+          model: 'llama3.2:3b', baseUrl: kaggleUrl,
+          sourceType: textMode ? 'text' : 'voice',
+        });
+        document.getElementById('transResult').style.display = '';
+        document.getElementById('transResultText').textContent = d.translatedText;
+        document.getElementById('transResultMeta').innerHTML =
+          'Provider: <strong>Kaggle / Ollama</strong> | Model: <strong>' + esc(d.model) + '</strong> | ' + d.latencyMs + 'ms';
+        toast('Translation complete (Kaggle)!', 'ok');
       } else {
         // ── Cloud provider translation (via server) ──
         const apiKey = document.getElementById('voiceTransKey').value.trim();
@@ -4099,10 +4233,22 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
       } catch(e) { toast('Detection failed: ' + e.message, 'err'); }
       return;
     }
-    const apiKey = document.getElementById('voiceTransKey').value.trim();
     const textMode = document.getElementById('transTextInput').style.display !== 'none';
     const text = textMode ? document.getElementById('voiceTransInput').value.trim() : document.getElementById('voiceTransInput2').value.trim();
-    if (!apiKey || !text) { toast('Need API key and text', 'err'); return; }
+    if (!text) { toast('Enter text first', 'err'); return; }
+
+    if (provider === 'kaggle') {
+      var kaggleUrl = document.getElementById('voiceKaggleUrl').value.trim();
+      if (!kaggleUrl) { toast('Enter your Kaggle ngrok URL', 'err'); return; }
+      try {
+        var d = await api('POST', '/v1/translate/detect', { text, provider: 'kaggle', apiKey: 'ollama', baseUrl: kaggleUrl });
+        toast('Detected: ' + d.language + ' (confidence: ' + d.confidence + ')', 'ok');
+      } catch(e) { toast('Detection failed: ' + (e.message || e), 'err'); }
+      return;
+    }
+
+    const apiKey = document.getElementById('voiceTransKey').value.trim();
+    if (!apiKey) { toast('Need API key', 'err'); return; }
     try {
       const d = await api('POST', '/v1/translate/detect', { text, provider, apiKey });
       toast('Detected: ' + d.language + ' (confidence: ' + d.confidence + ')', 'ok');
@@ -4816,16 +4962,25 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
         });
         translatedText = reply.choices[0]?.message?.content?.trim() || '';
       } else {
-        // Fall back to cloud API
-        const provider = document.getElementById('voiceTransProvider')?.value || 'openai';
-        const apiKey = document.getElementById('voiceTransKey')?.value?.trim();
-        if (!apiKey) { toast('Load a local model in AI Chat, or set an API key in Voice Lab', 'err'); btn.textContent = 'Translate'; btn.disabled = false; return; }
-        const d = await api('POST', '/v1/translate/text', {
-          text, targetLang: 'English', provider, apiKey, saveHistory: false,
-        });
-        translatedText = d.translatedText;
+        // Fall back to cloud or Kaggle API
+        var provider = document.getElementById('voiceTransProvider')?.value || 'openai';
+        if (provider === 'kaggle') {
+          var kaggleUrl = document.getElementById('voiceKaggleUrl')?.value?.trim() || document.getElementById('chatKaggleUrl')?.value?.trim();
+          if (!kaggleUrl) { toast('Enter your Kaggle ngrok URL in Voice Lab or AI Chat', 'err'); btn.textContent = 'Translate'; btn.disabled = false; return; }
+          var d = await api('POST', '/v1/translate/text', {
+            text, targetLang: 'English', provider: 'kaggle', apiKey: 'ollama', baseUrl: kaggleUrl, saveHistory: false,
+          });
+          translatedText = d.translatedText;
+        } else {
+          var apiKey = document.getElementById('voiceTransKey')?.value?.trim();
+          if (!apiKey) { toast('Load a local model in AI Chat, or set an API key in Voice Lab', 'err'); btn.textContent = 'Translate'; btn.disabled = false; return; }
+          var d = await api('POST', '/v1/translate/text', {
+            text, targetLang: 'English', provider, apiKey, saveHistory: false,
+          });
+          translatedText = d.translatedText;
+        }
       }
-      const translated = document.createElement('div');
+      var translated = document.createElement('div');
       translated.style.cssText = 'font-size:11px;color:var(--accent);margin-top:4px;font-style:italic;';
       translated.textContent = '🌐 ' + translatedText;
       btn.parentElement.appendChild(translated);
@@ -5275,18 +5430,32 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
         translated = reply.choices[0]?.message?.content?.trim() || 'No translation';
         document.getElementById('gvStatus').textContent = 'Translated (Local LLM, offline)';
       } else {
-        const provider = document.getElementById('voiceTransProvider')?.value || 'openai';
-        const apiKey = document.getElementById('voiceTransKey')?.value?.trim();
-        if (!apiKey) {
-          respEl.innerHTML = '<span style="color:var(--orange);">No AI available. Load a local model in AI Chat, or set an API key in Voice Lab.</span>';
-          document.getElementById('gvStatus').textContent = 'No translator configured';
-          return;
+        var provider = document.getElementById('voiceTransProvider')?.value || 'openai';
+        if (provider === 'kaggle') {
+          var kaggleUrl = document.getElementById('voiceKaggleUrl')?.value?.trim() || document.getElementById('chatKaggleUrl')?.value?.trim();
+          if (!kaggleUrl) {
+            respEl.innerHTML = '<span style="color:var(--orange);">Enter your Kaggle ngrok URL in Voice Lab or AI Chat.</span>';
+            document.getElementById('gvStatus').textContent = 'No translator configured';
+            return;
+          }
+          var d = await api('POST', '/v1/translate/text', {
+            text, targetLang: 'English', provider: 'kaggle', apiKey: 'ollama', baseUrl: kaggleUrl, saveHistory: false,
+          });
+          translated = d.translatedText;
+          document.getElementById('gvStatus').textContent = 'Translated via Kaggle / Ollama';
+        } else {
+          var apiKey = document.getElementById('voiceTransKey')?.value?.trim();
+          if (!apiKey) {
+            respEl.innerHTML = '<span style="color:var(--orange);">No AI available. Load a local model in AI Chat, or set an API key in Voice Lab.</span>';
+            document.getElementById('gvStatus').textContent = 'No translator configured';
+            return;
+          }
+          var d = await api('POST', '/v1/translate/text', {
+            text, targetLang: 'English', provider, apiKey, saveHistory: false,
+          });
+          translated = d.translatedText;
+          document.getElementById('gvStatus').textContent = 'Translated via ' + provider;
         }
-        const d = await api('POST', '/v1/translate/text', {
-          text, targetLang: 'English', provider, apiKey, saveHistory: false,
-        });
-        translated = d.translatedText;
-        document.getElementById('gvStatus').textContent = 'Translated via ' + provider;
       }
       respEl.innerHTML = '<strong style="color:var(--accent);">Translation:</strong> ' + esc(translated);
     } catch(e) {

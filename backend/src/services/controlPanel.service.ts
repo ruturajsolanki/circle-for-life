@@ -661,6 +661,7 @@ export class ControlPanelService {
         openrouter: ['meta-llama/llama-3.3-70b-instruct', 'anthropic/claude-3.5-sonnet', 'google/gemini-2.0-flash-001'],
         together: ['meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo', 'mistralai/Mixtral-8x7B-Instruct-v0.1'],
         deepseek: ['deepseek-chat', 'deepseek-reasoner'],
+        kaggle: ['llama3.2:3b', 'llama3.1:8b', 'mistral:7b', 'phi3:mini', 'gemma2:2b', 'qwen2.5:7b'],
       },
       image: {
         openai: ['dall-e-3', 'dall-e-2'],
@@ -773,6 +774,22 @@ export class ControlPanelService {
             ],
             source: 'fallback',
           };
+        }
+
+        case 'kaggle': {
+          // Kaggle runs Ollama — try fetching models from the ngrok URL
+          const kaggleUrl = process.env.KAGGLE_OLLAMA_URL || 'http://localhost:11434';
+          try {
+            const r = await axios.get(`${kaggleUrl}/api/tags`, { timeout: 8000, headers: { 'ngrok-skip-browser-warning': 'true' } });
+            const models = (r.data.models || []).map((m: any) => ({ id: m.name, name: m.name, owned_by: 'ollama' }));
+            return { models, source: 'live' as const };
+          } catch {
+            // Fallback to static list
+            return {
+              models: this.getAvailableModels().chat.kaggle.map(id => ({ id, name: id, owned_by: 'ollama' })),
+              source: 'fallback' as const,
+            };
+          }
         }
 
         default:

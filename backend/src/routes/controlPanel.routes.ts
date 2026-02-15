@@ -10,7 +10,7 @@ import {
 // ─── Validation Schemas ─────────────────────────────────────────────────────
 
 const chatProviders: ChatProvider[] = [
-  'openai', 'anthropic', 'google', 'groq', 'mistral', 'openrouter', 'together', 'deepseek',
+  'openai', 'anthropic', 'google', 'groq', 'mistral', 'openrouter', 'together', 'deepseek', 'kaggle',
 ];
 
 const imageProviders: ImageProvider[] = [
@@ -19,7 +19,7 @@ const imageProviders: ImageProvider[] = [
 
 const chatRequestSchema = z.object({
   provider: z.enum(chatProviders as [string, ...string[]]),
-  apiKey: z.string().min(1, 'API key is required'),
+  apiKey: z.string().min(1, 'API key is required').or(z.literal('ollama')),
   model: z.string().optional(),
   baseUrl: z.string().url().optional(),
   messages: z.array(
@@ -131,7 +131,7 @@ export async function controlPanelRoutes(app: FastifyInstance) {
     handler: async (request, reply) => {
       const body = z.object({
         provider: z.enum(chatProviders as [string, ...string[]]),
-        apiKey: z.string().min(1),
+        apiKey: z.string().min(1).or(z.literal('ollama')),
       }).parse(request.body);
 
       const result = await ControlPanelService.fetchLiveModels(
@@ -153,7 +153,7 @@ export async function controlPanelRoutes(app: FastifyInstance) {
     handler: async (request, reply) => {
       const body = z.object({
         provider: z.enum(chatProviders as [string, ...string[]]),
-        apiKey: z.string().min(1),
+        apiKey: z.string().min(1).or(z.literal('ollama')),
         model: z.string().optional(),
         baseUrl: z.string().url().optional(),
       }).parse(request.body);
@@ -200,6 +200,7 @@ const providerLabels: Record<string, string> = {
   openrouter: 'OpenRouter',
   together: 'Together AI',
   deepseek: 'DeepSeek',
+  kaggle: 'Kaggle / Ollama (Free GPU)',
 };
 
 const imageProviderLabels: Record<string, string> = {

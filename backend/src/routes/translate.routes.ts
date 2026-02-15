@@ -37,6 +37,7 @@ export async function translateRoutes(app: FastifyInstance) {
         provider: z.string().min(1),
         apiKey: z.string().min(1),
         model: z.string().optional(),
+        baseUrl: z.string().url().optional(),
         sourceType: z.enum(['text', 'voice']).optional().default('text'),
         saveHistory: z.boolean().optional().default(true),
       }).parse(request.body);
@@ -51,6 +52,7 @@ export async function translateRoutes(app: FastifyInstance) {
           provider: body.provider as ChatProvider,
           apiKey: body.apiKey,
           model: body.model,
+          baseUrl: body.baseUrl,
         });
 
         // Save to history
@@ -92,6 +94,7 @@ export async function translateRoutes(app: FastifyInstance) {
         provider: z.string().min(1),
         apiKey: z.string().min(1),
         model: z.string().optional(),
+        baseUrl: z.string().url().optional(),
       }).parse(request.body);
 
       try {
@@ -100,6 +103,7 @@ export async function translateRoutes(app: FastifyInstance) {
           body.provider as ChatProvider,
           body.apiKey,
           body.model,
+          body.baseUrl,
         );
         return reply.send(result);
       } catch (error: any) {

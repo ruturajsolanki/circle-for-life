@@ -19,6 +19,7 @@ export interface TranslationRequest {
   provider: ChatProvider;
   apiKey: string;
   model?: string;
+  baseUrl?: string;         // For Kaggle / Ollama — ngrok URL
 }
 
 export interface TranslationResult {
@@ -69,7 +70,7 @@ export class TranslationService {
    * Translate text using an LLM provider.
    */
   static async translate(req: TranslationRequest): Promise<TranslationResult> {
-    const { text, sourceLang, targetLang, provider, apiKey, model } = req;
+    const { text, sourceLang, targetLang, provider, apiKey, model, baseUrl } = req;
     const startTime = Date.now();
 
     // Get system prompt from DB
@@ -84,7 +85,7 @@ export class TranslationService {
 
     try {
       const result = await ControlPanelService.chat({
-        provider: { provider, apiKey, model } as ProviderConfig,
+        provider: { provider, apiKey, model, baseUrl } as ProviderConfig,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userMessage },
@@ -119,12 +120,13 @@ export class TranslationService {
     provider: ChatProvider,
     apiKey: string,
     model?: string,
+    baseUrl?: string,
   ): Promise<LanguageDetectionResult> {
     const startTime = Date.now();
 
     try {
       const result = await ControlPanelService.chat({
-        provider: { provider, apiKey, model } as ProviderConfig,
+        provider: { provider, apiKey, model, baseUrl } as ProviderConfig,
         messages: [
           {
             role: 'system',
