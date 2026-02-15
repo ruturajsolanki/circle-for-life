@@ -6641,7 +6641,10 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
           '<td style="padding:10px;font-size:12px;color:var(--text2);">' + dur + '</td>' +
           '<td style="padding:10px;font-size:12px;color:var(--text2);">' + c.messageCount + '</td>' +
           '<td style="padding:10px;font-size:11px;color:var(--text3);">' + new Date(c.startedAt).toLocaleString() + '</td>' +
-          '<td style="padding:10px;"><button class="btn-small" style="font-size:10px;padding:3px 10px;" onclick="event.stopPropagation();viewCallDetail(' + idx + ')">View</button></td>' +
+          '<td style="padding:10px;display:flex;gap:4px;">' +
+            '<button class="btn-small" style="font-size:10px;padding:3px 10px;" onclick="event.stopPropagation();viewCallDetail(' + idx + ')">View</button>' +
+            (c.status === 'active' ? '<button class="btn-small" style="font-size:10px;padding:3px 10px;background:var(--red);color:#fff;" onclick="event.stopPropagation();forceEndCall(\\'' + esc(c.id) + '\\')">End</button>' : '') +
+          '</td>' +
         '</tr>';
       }).join('') +
       '</tbody></table>';
@@ -6687,6 +6690,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
             (c.endedAt ? ' &middot; Ended: ' + new Date(c.endedAt).toLocaleString() : '') +
           '</div>' +
         '</div>' +
+        (c.status === 'active' ? '<button onclick="forceEndCall(\\'' + esc(c.id) + '\\')" style="margin-left:auto;padding:8px 18px;border-radius:8px;border:none;background:var(--red);color:#fff;font-weight:700;font-size:12px;cursor:pointer;white-space:nowrap;">Force End Call</button>' : '') +
       '</div>';
 
     // Summary
@@ -6747,6 +6751,20 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     }
 
     document.getElementById('callDetailOverlay').style.display = '';
+  }
+
+  async function forceEndCall(sessionId) {
+    if (!confirm('Force end this call? The user will be disconnected.')) return;
+    try {
+      await api('POST', '/v1/agent-calls/admin/force-end/' + sessionId);
+      toast('Call force-ended successfully', 'ok');
+      // Close detail overlay if open
+      document.getElementById('callDetailOverlay').style.display = 'none';
+      // Refresh call logs
+      loadCallLogs();
+    } catch (e) {
+      toast('Failed to end call: ' + (e.error || e.message), 'err');
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

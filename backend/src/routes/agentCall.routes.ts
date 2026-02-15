@@ -604,6 +604,44 @@ export async function agentCallRoutes(app: FastifyInstance) {
     };
   });
 
+  // ═══ POST /admin/force-end/:id — Admin force-end a stuck call ═════════════
+  app.post('/admin/force-end/:id', {
+    preHandler: [localAuthenticate, requirePermission('system.config')],
+  }, async (request: any, reply) => {
+    const { id } = request.params as any;
+    const session = activeSessions.get(id);
+    if (!session) return reply.status(404).send({ error: { message: 'Session not found or already cleaned up' } });
+
+    if (session.status !== 'active') {
+      return reply.status(400).send({ error: { message: `Session already ${session.status}` } });
+    }
+
+    session.status = 'ended';
+    session.endedAt = new Date().toISOString();
+    session.summary = `Force-ended by admin (${request.userData?.username || 'unknown'}).`;
+
+    // Calculate duration
+    const durationMs = new Date(session.endedAt).getTime() - new Date(session.startedAt).getTime();
+    const durationSec = Math.floor(durationMs / 1000);
+
+    // Persist to DB
+    try { await persistCallSession(session, durationSec); } catch (e: any) {
+      logger.error('Failed to persist force-ended session:', e.message);
+    }
+
+    // Clean up from memory after a delay
+    setTimeout(() => activeSessions.delete(id), 30000);
+
+    logger.info(`Admin ${request.userData?.username} force-ended call session ${id}`);
+
+    return {
+      sessionId: id,
+      status: 'ended',
+      duration: durationSec,
+      message: 'Call force-ended successfully',
+    };
+  });
+
   // ═══ GET /:id/transcript — Get full transcript ════════════════════════════
   app.get('/:id/transcript', {
     preHandler: [localAuthenticate],
