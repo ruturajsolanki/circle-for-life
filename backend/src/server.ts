@@ -1,3 +1,4 @@
+// Circle for Life — Backend Server
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
