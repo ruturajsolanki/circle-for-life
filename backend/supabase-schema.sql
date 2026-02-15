@@ -309,6 +309,28 @@ ALTER TABLE chat_messages ADD CONSTRAINT chat_messages_content_type_check
 ALTER TABLE users ADD COLUMN IF NOT EXISTS location TEXT DEFAULT '';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS website TEXT DEFAULT '';
 
+-- ─── Agent Call Sessions (persistent call logs) ─────────────────────────────
+CREATE TABLE IF NOT EXISTS agent_call_sessions (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL DEFAULT '',
+  user_name TEXT NOT NULL DEFAULT '',
+  agent_id TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'ended',
+  source TEXT NOT NULL DEFAULT 'browser',
+  caller_phone TEXT DEFAULT '',
+  transcript JSONB DEFAULT '[]'::jsonb,
+  supervisor_notes JSONB DEFAULT '[]'::jsonb,
+  summary TEXT DEFAULT '',
+  duration INTEGER DEFAULT 0,
+  escalated_to TEXT DEFAULT '',
+  escalated_at TEXT DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  ended_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_agent_call_sessions_user ON agent_call_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_agent_call_sessions_created ON agent_call_sessions(created_at DESC);
+
 -- ═══════════════════════════════════════════════════════════════════════════
 -- Done! Your database is ready for Circle for Life.
 -- ═══════════════════════════════════════════════════════════════════════════

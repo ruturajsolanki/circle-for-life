@@ -73,6 +73,19 @@ async function runMigrations(): Promise<void> {
       // Ignore — migration check is best-effort
     }
   }
+
+  // Ensure agent_call_sessions table exists
+  try {
+    const { error } = await sb.from('agent_call_sessions').select('id').limit(1);
+    if (error && (error.message?.includes('does not exist') || error.message?.includes('relation') || error.code === '42P01')) {
+      logger.warn('Table agent_call_sessions does not exist. Run this SQL in Supabase SQL Editor:');
+      logger.warn(`CREATE TABLE IF NOT EXISTS agent_call_sessions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL DEFAULT '', user_name TEXT NOT NULL DEFAULT '', agent_id TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'ended', source TEXT NOT NULL DEFAULT 'browser', caller_phone TEXT DEFAULT '', transcript JSONB DEFAULT '[]'::jsonb, supervisor_notes JSONB DEFAULT '[]'::jsonb, summary TEXT DEFAULT '', duration INTEGER DEFAULT 0, escalated_to TEXT DEFAULT '', escalated_at TEXT DEFAULT '', created_at TIMESTAMPTZ DEFAULT NOW(), ended_at TIMESTAMPTZ DEFAULT NOW()); CREATE INDEX IF NOT EXISTS idx_agent_call_sessions_user ON agent_call_sessions(user_id); CREATE INDEX IF NOT EXISTS idx_agent_call_sessions_created ON agent_call_sessions(created_at DESC);`);
+    } else {
+      logger.info('agent_call_sessions table: OK');
+    }
+  } catch {
+    // best effort
+  }
 }
 
 // ─── Seed Default Admin ─────────────────────────────────────────────────────

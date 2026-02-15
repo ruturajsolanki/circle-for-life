@@ -179,6 +179,49 @@ interface CallSession {
 
 const activeSessions: Map<string, CallSession> = new Map();
 
+// ─── Persist helper ──────────────────────────────────────────────────────────
+
+async function persistCallSession(session: CallSession, durationSec: number) {
+  const { agentCallSessionsDB } = await import('../db/index.js');
+  if (!agentCallSessionsDB) return;
+
+  // Check if already persisted (avoid duplicates)
+  try {
+    const existing = await agentCallSessionsDB.findById(session.id);
+    if (existing) {
+      // Update instead of create
+      await agentCallSessionsDB.updateById(session.id, {
+        status: session.status,
+        transcript: session.transcript,
+        supervisorNotes: session.supervisorNotes || [],
+        summary: session.summary || '',
+        duration: durationSec,
+        endedAt: session.endedAt || new Date().toISOString(),
+      });
+      return;
+    }
+  } catch { /* not found — create below */ }
+
+  await agentCallSessionsDB.create({
+    id: session.id,
+    userId: session.userId,
+    userName: session.userName || '',
+    agentId: session.agentId,
+    status: session.status,
+    source: session.source || 'browser',
+    callerPhone: session.callerPhone || '',
+    transcript: session.transcript,
+    supervisorNotes: session.supervisorNotes || [],
+    summary: session.summary || '',
+    duration: durationSec,
+    escalatedTo: '',
+    escalatedAt: '',
+    createdAt: session.startedAt,
+    endedAt: session.endedAt || new Date().toISOString(),
+  });
+  logger.info(`Call session ${session.id} persisted to DB (${session.source})`);
+}
+
 // ─── Routes ──────────────────────────────────────────────────────────────────
 
 export async function agentCallRoutes(app: FastifyInstance) {
@@ -494,23 +537,7 @@ export async function agentCallRoutes(app: FastifyInstance) {
 
     // Persist to DB (best effort) — store in agent_call_sessions
     try {
-      const { agentCallSessionsDB } = await import('../db/index.js');
-      if (agentCallSessionsDB) {
-        await agentCallSessionsDB.create({
-          id: session.id,
-          userId: session.userId,
-          agentId: session.agentId,
-          status: session.status,
-          transcript: JSON.stringify(session.transcript),
-          supervisorNotes: JSON.stringify(session.supervisorNotes),
-          summary: session.summary,
-          duration: durationSec,
-          escalatedTo: '',
-          escalatedAt: '',
-          createdAt: session.startedAt,
-          endedAt: session.endedAt,
-        });
-      }
+      await persistCallSession(session, durationSec);
     } catch (e: any) {
       logger.error('Failed to persist call session:', e.message);
     }
@@ -866,7 +893,10 @@ export async function agentCallRoutes(app: FastifyInstance) {
           sess.status = 'ended';
           sess.endedAt = new Date().toISOString();
           sess.summary = 'Phone call ended.';
+          const dur = Math.floor((new Date(sess.endedAt).getTime() - new Date(sess.startedAt).getTime()) / 1000);
           logger.info(`Phone session ${sess.id} ended via Twilio status: ${status}`);
+          // Persist phone call to DB
+          try { await persistCallSession(sess, dur); } catch (e: any) { logger.error('Failed to persist phone call:', e.message); }
           break;
         }
       }
@@ -935,8 +965,9 @@ export async function agentCallRoutes(app: FastifyInstance) {
     preHandler: [localAuthenticate, requirePermission('users.list')],
   }, async () => {
     const logs: any[] = [];
+    const seenIds = new Set<string>();
 
-    // Collect all sessions (active + ended)
+    // 1) Collect active in-memory sessions (these are the most up-to-date)
     for (const [, sess] of activeSessions) {
       const agent = AGENTS.find(a => a.id === sess.agentId);
       const duration = sess.endedAt
@@ -961,6 +992,44 @@ export async function agentCallRoutes(app: FastifyInstance) {
         transcript: sess.transcript,
         supervisorNotes: sess.supervisorNotes || [],
       });
+      seenIds.add(sess.id);
+    }
+
+    // 2) Load persisted sessions from DB (survived restarts)
+    try {
+      const { agentCallSessionsDB } = await import('../db/index.js');
+      const dbRows = await agentCallSessionsDB.findAll();
+      for (const row of dbRows) {
+        if (seenIds.has(row.id)) continue; // already from memory
+        const agent = AGENTS.find(a => a.id === row.agentId);
+        const transcript = Array.isArray(row.transcript)
+          ? row.transcript
+          : (typeof row.transcript === 'string' ? JSON.parse(row.transcript || '[]') : []);
+        const supervisorNotes = Array.isArray(row.supervisorNotes)
+          ? row.supervisorNotes
+          : (typeof row.supervisorNotes === 'string' ? JSON.parse(row.supervisorNotes || '[]') : []);
+        logs.push({
+          id: row.id,
+          userId: row.userId || '',
+          userName: row.userName || '',
+          agentId: row.agentId || '',
+          agentName: agent?.name || 'Unknown',
+          agentAvatar: agent?.avatar || '?',
+          agentSpecialty: agent?.specialty || '',
+          status: row.status || 'ended',
+          summary: row.summary || '',
+          messageCount: transcript.filter((t: any) => t.role !== 'system').length,
+          startedAt: row.createdAt || '',
+          endedAt: row.endedAt || '',
+          durationSec: row.duration || 0,
+          source: row.source || 'browser',
+          callerPhone: row.callerPhone || '',
+          transcript,
+          supervisorNotes,
+        });
+      }
+    } catch (e: any) {
+      logger.warn('Could not load persisted call logs:', e.message);
     }
 
     logs.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
