@@ -13,10 +13,60 @@
 
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { createHmac } from 'crypto';
 import axios from 'axios';
 import { localAuthenticate, requirePermission } from '../middleware/rbac.middleware.js';
 import { ControlPanelService, type ChatMessage, type ProviderConfig } from '../services/controlPanel.service.js';
 import { logger } from '../utils/logger.js';
+
+// ─── Twilio Webhook Signature Validation ─────────────────────────────────────
+
+/** Ensure webhook URLs use HTTPS in production to prevent man-in-the-middle */
+function getSecureServerUrl(): string {
+  let url = process.env.SERVER_URL || `http://localhost:${process.env.PORT || 3000}`;
+  // In production (non-localhost), force HTTPS
+  if (!url.includes('localhost') && !url.includes('127.0.0.1') && url.startsWith('http://')) {
+    url = url.replace('http://', 'https://');
+  }
+  return url;
+}
+
+function validateTwilioSignature(request: any): boolean {
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+  if (!authToken) {
+    // If no auth token configured, allow (dev mode)
+    logger.warn('TWILIO_AUTH_TOKEN not set — skipping webhook signature validation');
+    return true;
+  }
+
+  const signature = request.headers['x-twilio-signature'];
+  if (!signature) {
+    logger.warn('Twilio webhook missing X-Twilio-Signature header');
+    return false;
+  }
+
+  // Build the full URL Twilio used to reach us (must match what Twilio sends to)
+  // Twilio signs the FULL URL including query params for POST requests
+  const serverUrl = getSecureServerUrl();
+  const fullUrl = serverUrl + request.url;
+
+  // Get POST parameters sorted alphabetically
+  const body = request.body || {};
+  const params = Object.keys(body).sort().reduce((acc: string, key: string) => acc + key + body[key], '');
+
+  // Compute expected signature: HMAC-SHA1 of URL + sorted params, base64-encoded
+  const expected = createHmac('sha1', authToken)
+    .update(fullUrl + params)
+    .digest('base64');
+
+  // Constant-time comparison
+  if (expected.length !== signature.length) return false;
+  let mismatch = 0;
+  for (let i = 0; i < expected.length; i++) {
+    mismatch |= expected.charCodeAt(i) ^ signature.charCodeAt(i);
+  }
+  return mismatch === 0;
+}
 
 // ─── Agent Definitions ───────────────────────────────────────────────────────
 
@@ -612,8 +662,19 @@ export async function agentCallRoutes(app: FastifyInstance) {
   //  TWILIO INBOUND IVR — Call the Twilio number → AI agent via phone
   // ═══════════════════════════════════════════════════════════════════════════
 
+  // ─── Twilio webhook guard ─────────────────────────────────────────────────
+  function twilioGuard(request: any, reply: any): boolean {
+    if (!validateTwilioSignature(request)) {
+      logger.warn('Twilio webhook rejected: invalid signature from ' + (request.ip || 'unknown'));
+      reply.status(403).type('text/xml').send('<?xml version="1.0" encoding="UTF-8"?><Response><Say>Unauthorized.</Say></Response>');
+      return false;
+    }
+    return true;
+  }
+
   // ═══ POST /twilio/incoming — Main entry: incoming call to Twilio number ════
   app.post('/twilio/incoming', async (request: any, reply) => {
+    if (!twilioGuard(request, reply)) return;
     const body = request.body as any;
     const callerPhone = body?.From || 'Unknown';
     const callSid = body?.CallSid || '';
@@ -621,7 +682,7 @@ export async function agentCallRoutes(app: FastifyInstance) {
 
     // IVR Menu: Press 1-4 for an agent
     const agentMenu = AGENTS.map((a, i) => `Press ${i + 1} for ${a.name}, ${a.specialty}.`).join(' ');
-    const serverUrl = process.env.SERVER_URL || `http://localhost:${process.env.PORT || 3000}`;
+    const serverUrl = getSecureServerUrl();
 
     reply.type('text/xml');
     return `<?xml version="1.0" encoding="UTF-8"?>
@@ -636,11 +697,12 @@ export async function agentCallRoutes(app: FastifyInstance) {
 
   // ═══ POST /twilio/agent-select — Handle DTMF digit → start AI session ═════
   app.post('/twilio/agent-select', async (request: any, reply) => {
+    if (!twilioGuard(request, reply)) return;
     const body = request.body as any;
     const digit = body?.Digits;
     const callerPhone = (request.query as any)?.from || body?.From || 'Unknown';
     const callSid = (request.query as any)?.callSid || body?.CallSid || '';
-    const serverUrl = process.env.SERVER_URL || `http://localhost:${process.env.PORT || 3000}`;
+    const serverUrl = getSecureServerUrl();
 
     logger.info(`Twilio agent select: digit=${digit}, caller=${callerPhone}`);
 
@@ -715,10 +777,11 @@ export async function agentCallRoutes(app: FastifyInstance) {
 
   // ═══ POST /twilio/converse — Speech-to-AI loop ════════════════════════════
   app.post('/twilio/converse', async (request: any, reply) => {
+    if (!twilioGuard(request, reply)) return;
     const body = request.body as any;
     const sessionId = (request.query as any)?.session;
     const speechResult = body?.SpeechResult || '';
-    const serverUrl = process.env.SERVER_URL || `http://localhost:${process.env.PORT || 3000}`;
+    const serverUrl = getSecureServerUrl();
 
     const session = sessionId ? activeSessions.get(sessionId) : null;
     if (!session || session.status !== 'active') {
@@ -856,6 +919,7 @@ export async function agentCallRoutes(app: FastifyInstance) {
 
   // ═══ POST /twilio/voice — TwiML webhook for outbound escalation calls ═════
   app.post('/twilio/voice', async (request: any, reply) => {
+    if (!twilioGuard(request, reply)) return;
     const { sessionId } = request.query as any;
     const session = sessionId ? activeSessions.get(sessionId) : null;
 
@@ -880,7 +944,8 @@ export async function agentCallRoutes(app: FastifyInstance) {
   });
 
   // ═══ POST /twilio/status — Twilio status callback ════════════════════════
-  app.post('/twilio/status', async (request: any) => {
+  app.post('/twilio/status', async (request: any, reply) => {
+    if (!twilioGuard(request, reply)) return;
     const body = request.body as any;
     const callSid = body?.CallSid;
     const status = body?.CallStatus;
@@ -1284,9 +1349,9 @@ async function triggerTwilioEscalation(session: CallSession, agent: AgentDef): P
     };
 
     // Optionally add status callback if we have a public SERVER_URL
-    const serverUrl = process.env.SERVER_URL;
-    if (serverUrl && !serverUrl.includes('localhost') && !serverUrl.includes('127.0.0.1')) {
-      callParams.StatusCallback = `${serverUrl}/v1/agent-calls/twilio/status`;
+    const secureUrl = getSecureServerUrl();
+    if (secureUrl && !secureUrl.includes('localhost') && !secureUrl.includes('127.0.0.1')) {
+      callParams.StatusCallback = `${secureUrl}/v1/agent-calls/twilio/status`;
       callParams.StatusCallbackMethod = 'POST';
     }
 

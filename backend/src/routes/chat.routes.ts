@@ -21,6 +21,7 @@ import {
 } from '../db/index.js';
 import { localAuthenticate } from '../middleware/rbac.middleware.js';
 import { hasFeatureUnlock } from '../services/levels.service.js';
+import { encryptMessage, decryptMessage } from '../utils/encryption.js';
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 
@@ -277,7 +278,7 @@ export async function chatRoutes(app: FastifyInstance) {
         conversationId: existing.id,
         senderId: userId,
         senderName: user.displayName || user.username,
-        content: body.message,
+        content: encryptMessage(body.message),
         contentType: 'text',
         originalContent: '',
         translatedContent: '',
@@ -302,7 +303,9 @@ export async function chatRoutes(app: FastifyInstance) {
         updatedAt: now,
       });
 
-      return { conversation: existing, message, isNew: false };
+      // Return decrypted content to client
+      const responseMsg = { ...message, content: body.message };
+      return { conversation: existing, message: responseMsg, isNew: false };
     }
 
     // Create new conversation
@@ -337,7 +340,7 @@ export async function chatRoutes(app: FastifyInstance) {
       conversationId: convoId,
       senderId: userId,
       senderName: user.displayName || user.username,
-      content: body.message,
+      content: encryptMessage(body.message),
       contentType: 'text',
       originalContent: '',
       translatedContent: '',
@@ -355,7 +358,9 @@ export async function chatRoutes(app: FastifyInstance) {
     await usersDB.increment(userId, 'gemBalance', 3);
     await usersDB.increment(userId, 'totalGemsEarned', 3);
 
-    return reply.status(201).send({ conversation, message, isNew: true, gemsAwarded: 3 });
+    // Return decrypted content to the sender in the response
+    const responseMsg = { ...message, content: body.message };
+    return reply.status(201).send({ conversation, message: responseMsg, isNew: true, gemsAwarded: 3 });
   });
 
   // ═══ GET /conversations/:id/messages — Get messages ═════════════════════
@@ -403,7 +408,13 @@ export async function chatRoutes(app: FastifyInstance) {
     const isP1 = convo.participant1Id === userId;
     await conversationsDB.updateById(id, isP1 ? { unreadCount1: 0 } : { unreadCount2: 0 });
 
-    return { messages };
+    // Decrypt messages before sending to client
+    const decrypted = messages.map((m: any) => ({
+      ...m,
+      content: m.contentType === 'text' || !m.contentType ? decryptMessage(m.content) : m.content,
+    }));
+
+    return { messages: decrypted };
   });
 
   // ═══ POST /conversations/:id/messages — Send message ════════════════════
@@ -500,12 +511,14 @@ export async function chatRoutes(app: FastifyInstance) {
     const sched = detectScheduling(body.content);
 
     const msgId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    // Encrypt text messages at rest; skip encryption for images/signals
+    const encContent = body.contentType === 'text' ? encryptMessage(body.content) : body.content;
     const message: any = {
       id: msgId,
       conversationId: id,
       senderId: userId,
       senderName: user?.displayName || user?.username || 'Unknown',
-      content: body.content,
+      content: encContent,
       contentType: body.contentType,
       imageUrl: body.imageUrl || '',
       originalContent: '',
@@ -554,7 +567,9 @@ export async function chatRoutes(app: FastifyInstance) {
       updatedAt: now,
     });
 
-    return reply.status(201).send({ message });
+    // Return decrypted content to sender
+    const responseMsg = { ...message, content: body.content };
+    return reply.status(201).send({ message: responseMsg });
   });
 
   // ═══ GET /users/available — List chat-eligible users ════════════════════

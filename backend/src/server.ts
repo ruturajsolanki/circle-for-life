@@ -49,7 +49,20 @@ async function buildServer() {
 
   await app.register(helmet, {
     contentSecurityPolicy: false,
+    hsts: env.NODE_ENV === 'production' ? { maxAge: 31536000, includeSubDomains: true } : false,
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
   });
+
+  // ── HTTPS redirect in production (behind Railway/reverse proxy) ────────
+  if (env.NODE_ENV === 'production') {
+    app.addHook('onRequest', async (request, reply) => {
+      const proto = request.headers['x-forwarded-proto'];
+      if (proto === 'http') {
+        const host = request.headers['host'] || '';
+        return reply.redirect(301, `https://${host}${request.url}`);
+      }
+    });
+  }
 
   await app.register(jwt, {
     secret: env.JWT_SECRET,
