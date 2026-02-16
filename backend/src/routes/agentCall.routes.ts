@@ -464,7 +464,9 @@ export async function agentCallRoutes(app: FastifyInstance) {
         { role: 'agent', text: agent.greeting, timestamp: now },
       ],
       supervisorNotes: [],
-      providerConfig: body.provider ? body.provider as ProviderConfig : null,
+      providerConfig: (body.provider && body.provider.provider !== 'server_default')
+        ? body.provider as ProviderConfig
+        : getPhoneCallProvider(),
       elevenLabsKey: body.elevenLabsKey || process.env.ELEVENLABS_API_KEY || '',
       startedAt: now,
       endedAt: '',
@@ -476,6 +478,8 @@ export async function agentCallRoutes(app: FastifyInstance) {
     if (process.env.PHONE_LLM_MODEL && session.providerConfig) {
       session.providerConfig.model = process.env.PHONE_LLM_MODEL;
     }
+
+    logger.info(`Browser call provider: ${session.providerConfig?.provider || 'none'}, model=${session.providerConfig?.model || 'default'}, source=${body.provider?.provider === 'server_default' || !body.provider ? 'server_config' : 'client'}`);
 
     activeSessions.set(sessionId, session);
 

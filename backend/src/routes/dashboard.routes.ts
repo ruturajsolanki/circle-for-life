@@ -1701,7 +1701,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
             <button onclick="toggleAgentSettings()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;line-height:1;padding:2px 4px;">&times;</button>
           </div>
           <div class="agent-config-row">
-            <div class="field"><label>AI Provider</label><select id="agentLLMProvider" onchange="updateAgentModelList()"><option value="kaggle">Kaggle / Ollama (Free GPU)</option><option value="groq">Groq (Fast)</option><option value="openai">OpenAI</option><option value="anthropic">Anthropic</option><option value="google">Google Gemini</option><option value="deepseek">DeepSeek</option><option value="mistral">Mistral</option><option value="openrouter">OpenRouter</option><option value="together">Together AI</option></select></div>
+            <div class="field"><label>AI Provider</label><select id="agentLLMProvider" onchange="updateAgentModelList()"><option value="server_default">Server Default (Groq — recommended)</option><option value="kaggle">Kaggle / Ollama (Free GPU)</option><option value="groq">Groq (Fast)</option><option value="openai">OpenAI</option><option value="anthropic">Anthropic</option><option value="google">Google Gemini</option><option value="deepseek">DeepSeek</option><option value="mistral">Mistral</option><option value="openrouter">OpenRouter</option><option value="together">Together AI</option></select></div>
             <div class="field" id="agentKeyField"><label>API Key</label><input type="password" id="agentLLMKey" placeholder="Enter your API key"></div>
             <div class="field" id="agentKaggleUrlField" style="display:none;"><label>Kaggle URL (ngrok)</label><input type="text" id="agentKaggleUrl" placeholder="https://abc123.ngrok-free.app"></div>
             <div class="field"><label>Model (optional)</label><input type="text" id="agentLLMModel" placeholder="Default model"></div>
@@ -6086,7 +6086,9 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     var model = document.getElementById('agentLLMModel').value.trim();
     var elevenLabsKey = document.getElementById('agentElevenLabsKey').value.trim();
 
-    if (provider === 'kaggle') {
+    if (provider === 'server_default') {
+      // No validation needed — server handles provider config
+    } else if (provider === 'kaggle') {
       if (!kaggleUrl) {
         toast('Please enter your Kaggle ngrok URL in the settings above', 'err');
         return;
@@ -6099,13 +6101,18 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     }
 
     try {
-      var providerConfig = {
-        provider: provider,
-        apiKey: provider === 'kaggle' ? 'ollama' : apiKey,
-        model: model || undefined,
-      };
-      if (provider === 'kaggle') {
-        providerConfig.baseUrl = kaggleUrl;
+      var providerConfig = null;
+      if (provider === 'server_default') {
+        providerConfig = { provider: 'server_default' };
+      } else {
+        providerConfig = {
+          provider: provider,
+          apiKey: provider === 'kaggle' ? 'ollama' : apiKey,
+          model: model || undefined,
+        };
+        if (provider === 'kaggle') {
+          providerConfig.baseUrl = kaggleUrl;
+        }
       }
       var d = await api('POST', '/v1/agent-calls/start', {
         agentId: agentId,
@@ -6968,15 +6975,19 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
   function updateAgentModelList() {
     var provider = document.getElementById('agentLLMProvider').value;
     var isKaggle = provider === 'kaggle';
+    var isServerDefault = provider === 'server_default';
 
     // Toggle fields visibility
-    document.getElementById('agentKeyField').style.display = isKaggle ? 'none' : '';
+    document.getElementById('agentKeyField').style.display = (isKaggle || isServerDefault) ? 'none' : '';
     document.getElementById('agentKaggleUrlField').style.display = isKaggle ? '' : 'none';
     document.getElementById('agentKaggleHelp').style.display = isKaggle ? '' : 'none';
-    document.getElementById('agentNonKaggleHelp').style.display = isKaggle ? 'none' : '';
+    document.getElementById('agentNonKaggleHelp').style.display = (isKaggle || isServerDefault) ? 'none' : '';
 
     // Set default model hint
-    if (isKaggle) {
+    if (isServerDefault) {
+      document.getElementById('agentLLMModel').placeholder = 'Uses admin panel config';
+      document.getElementById('agentLLMModel').value = '';
+    } else if (isKaggle) {
       document.getElementById('agentLLMModel').placeholder = 'llama3.2:3b (or mistral:7b, phi3:mini)';
     } else {
       document.getElementById('agentLLMModel').placeholder = 'Default model';
