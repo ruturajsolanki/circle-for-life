@@ -6156,6 +6156,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
       appendCallMessage('agent', d.greeting);
 
       // Play greeting: client-side ElevenLabs TTS or Web Speech fallback
+      console.log('Agent call TTS config:', { voiceId: agentCallSession.voiceId, hasKey: !!agentCallSession.elevenLabsKey, keyLen: (agentCallSession.elevenLabsKey||'').length, voiceEngine: d.voiceEngine });
       if (agentCallSession.elevenLabsKey && agentCallSession.voiceId) {
         document.getElementById('callStatus').textContent = 'Speaking (ElevenLabs)...';
         document.getElementById('callAgentAvatar').classList.add('speaking');

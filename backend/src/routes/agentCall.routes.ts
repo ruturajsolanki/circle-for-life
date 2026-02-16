@@ -108,7 +108,7 @@ const AGENTS: AgentDef[] = [
 
 LANGUAGE: Detect the language the user is speaking. Always respond in the SAME language as the user. If they speak Hindi, respond in Hindi. If they speak Spanish, respond in Spanish. If unsure, respond in English. Be natural in whatever language you use.
 
-Remember: You are being spoken to via voice call. Keep responses concise and natural for speech.`,
+VOICE FORMAT: You are on a voice call. Your text will be read aloud by a text-to-speech engine. NEVER use asterisks, action markers, or stage directions like *gentle tone*, *soothing voice*, *smiles*, etc. Just speak naturally. Keep responses concise (2-4 sentences max).`,
     greeting: "Hi there, I'm Luna. I'm here to listen and support you. How are you feeling today?",
   },
   {
@@ -133,7 +133,7 @@ Remember: You are being spoken to via voice call. Keep responses concise and nat
 
 LANGUAGE: Detect the language the user is speaking. Always respond in the SAME language as the user. If they speak Hindi, respond in Hindi. If they speak Spanish, respond in Spanish. If unsure, respond in English. Be natural in whatever language you use.
 
-Remember: You are on a voice call. Be clear, structured, and brief. Number your steps when giving instructions.`,
+VOICE FORMAT: You are on a voice call. Your text will be read aloud by a text-to-speech engine. NEVER use asterisks, action markers, or stage directions like *pauses*, *nods*, etc. Just speak naturally. Be clear, structured, and brief. Number your steps when giving instructions.`,
     greeting: "Hey, I'm Atlas, your tech support specialist. What technical issue can I help you solve today?",
   },
   {
@@ -157,7 +157,7 @@ Remember: You are on a voice call. Be clear, structured, and brief. Number your 
 
 LANGUAGE: Detect the language the user is speaking. Always respond in the SAME language as the user. If they speak Hindi, respond in Hindi. If they speak Spanish, respond in Spanish. If unsure, respond in English. Be natural in whatever language you use.
 
-Remember: You are on a voice call. Be energetic but clear. Keep it conversational.`,
+VOICE FORMAT: You are on a voice call. Your text will be read aloud by a text-to-speech engine. NEVER use asterisks, action markers, or stage directions like *laughs*, *smiles*, etc. Just speak naturally. Be energetic but clear. Keep it conversational.`,
     greeting: "Hey! I'm Nova, your go-to assistant. I'm here to help with anything you need. What can I do for you?",
   },
   {
@@ -182,7 +182,7 @@ Remember: You are on a voice call. Be energetic but clear. Keep it conversationa
 
 LANGUAGE: Detect the language the user is speaking. Always respond in the SAME language as the user. If they speak Hindi, respond in Hindi. If they speak Spanish, respond in Spanish. If unsure, respond in English. Be natural in whatever language you use.
 
-Remember: You are on a voice call. Be inspiring but practical. Ask one powerful question at a time.`,
+VOICE FORMAT: You are on a voice call. Your text will be read aloud by a text-to-speech engine. NEVER use asterisks, action markers, or stage directions like *thoughtfully*, *nods*, etc. Just speak naturally. Be inspiring but practical. Ask one powerful question at a time.`,
     greeting: "Welcome, I'm Sage. I'm here to help you navigate your career and personal growth journey. What's on your mind today?",
   },
 ];
@@ -566,6 +566,9 @@ export async function agentCallRoutes(app: FastifyInstance) {
       // No provider configured — return a helpful message
       responseText = "I'd love to help, but I need an AI provider to be configured. Please set up an API key in the settings to enable my full capabilities.";
     }
+
+    // Strip action markers like *gentle tone*, *smiles*, etc. that LLMs sometimes add
+    responseText = responseText.replace(/\*[^*]{1,40}\*/g, '').replace(/\s{2,}/g, ' ').trim();
 
     // Add agent response to transcript
     const agentTime = new Date().toISOString();
