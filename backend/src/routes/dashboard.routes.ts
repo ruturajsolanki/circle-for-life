@@ -6121,6 +6121,9 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
         agentAvatar: d.agent.avatar,
         agentColor1: d.agent.color1,
         agentColor2: d.agent.color2,
+        voiceId: d.agent.voiceId || '',
+        voiceName: d.agent.voiceName || '',
+        elevenLabsKey: d.elevenLabsKey || '',
       };
 
       // Show call overlay
@@ -6145,17 +6148,16 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
       transcript.innerHTML = '';
       appendCallMessage('agent', d.greeting);
 
-      // Play greeting audio
-      if (d.greetingAudio) {
+      // Play greeting: client-side ElevenLabs TTS or Web Speech fallback
+      if (agentCallSession.elevenLabsKey && agentCallSession.voiceId) {
         document.getElementById('callStatus').textContent = 'Speaking (ElevenLabs)...';
         document.getElementById('callAgentAvatar').classList.add('speaking');
-        playAgentAudio(d.greetingAudio, function() {
+        generateClientTTS(d.greeting, agentCallSession.voiceId, agentCallSession.elevenLabsKey, function(ok) {
           document.getElementById('callAgentAvatar').classList.remove('speaking');
           document.getElementById('callStatus').textContent = 'Listening...';
           startAgentListening();
         });
       } else {
-        // No ElevenLabs — use Web Speech
         document.getElementById('callStatus').textContent = 'Speaking...';
         document.getElementById('callAgentAvatar').classList.add('speaking');
         speakWithWebSpeech(d.greeting, function() {
@@ -6301,21 +6303,12 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
       if (d.autoEscalated) {
         appendCallMessage('system', d.autoEscalationMessage || 'A real person has been contacted to help you. They will reach out shortly.');
         document.getElementById('callStatus').textContent = 'Connecting to human support...';
-        // Speak the escalation message then stop listening
         var escalationText = d.autoEscalationMessage || 'I have connected you with a real person. They are being notified now.';
-        if (d.audioBase64) {
-          playAgentAudio(d.audioBase64, function() {
-            agentCallProcessing = false;
-            document.getElementById('callAgentAvatar').classList.remove('speaking');
-            speakWithWebSpeech(escalationText, function() {});
-          });
-        } else {
-          speakWithWebSpeech(d.text, function() {
-            agentCallProcessing = false;
-            document.getElementById('callAgentAvatar').classList.remove('speaking');
-            speakWithWebSpeech(escalationText, function() {});
-          });
-        }
+        speakAgentResponse(d.text, function() {
+          agentCallProcessing = false;
+          document.getElementById('callAgentAvatar').classList.remove('speaking');
+          speakWithWebSpeech(escalationText, function() {});
+        });
         return;
       }
 
@@ -6326,25 +6319,14 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
         }
       }
 
-      // Play audio response
-      if (d.audioBase64) {
-        document.getElementById('callStatus').textContent = 'Speaking...';
-        document.getElementById('callAgentAvatar').classList.add('speaking');
-        playAgentAudio(d.audioBase64, function() {
-          agentCallProcessing = false;
-          document.getElementById('callAgentAvatar').classList.remove('speaking');
-          startAgentListening();
-        });
-      } else {
-        // No TTS — use Web Speech Synthesis
-        document.getElementById('callStatus').textContent = 'Speaking...';
-        document.getElementById('callAgentAvatar').classList.add('speaking');
-        speakWithWebSpeech(d.text, function() {
-          agentCallProcessing = false;
-          document.getElementById('callAgentAvatar').classList.remove('speaking');
-          startAgentListening();
-        });
-      }
+      // Speak agent response: client-side ElevenLabs TTS or Web Speech fallback
+      document.getElementById('callStatus').textContent = 'Speaking...';
+      document.getElementById('callAgentAvatar').classList.add('speaking');
+      speakAgentResponse(d.text, function() {
+        agentCallProcessing = false;
+        document.getElementById('callAgentAvatar').classList.remove('speaking');
+        startAgentListening();
+      });
 
     } catch(e) {
       toast('Agent error: ' + e.message, 'err');
@@ -6371,6 +6353,59 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
       agentCallAudio.play().catch(function() { if (onEnd) onEnd(); });
     } catch(e) {
       if (onEnd) onEnd();
+    }
+  }
+
+  // ── Client-side ElevenLabs TTS (runs from user's browser, avoids cloud IP blocks) ──
+  function generateClientTTS(text, voiceId, apiKey, callback) {
+    var ttsText = text
+      .replace(/```[\s\S]*?```/g, ' (code omitted) ')
+      .replace(/[*_~`#>]/g, '')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/\n+/g, '. ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (ttsText.length > 2000) ttsText = ttsText.substring(0, 1997) + '...';
+    if (!ttsText) { if (callback) callback(false); return; }
+
+    fetch('https://api.elevenlabs.io/v1/text-to-speech/' + voiceId, {
+      method: 'POST',
+      headers: {
+        'xi-api-key': apiKey,
+        'Content-Type': 'application/json',
+        'Accept': 'audio/mpeg',
+      },
+      body: JSON.stringify({
+        text: ttsText,
+        model_id: 'eleven_multilingual_v2',
+        voice_settings: { stability: 0.5, similarity_boost: 0.8, style: 0.3, use_speaker_boost: true },
+      }),
+    })
+    .then(function(resp) {
+      if (!resp.ok) throw new Error('ElevenLabs TTS failed: ' + resp.status);
+      return resp.blob();
+    })
+    .then(function(blob) {
+      var audioUrl = URL.createObjectURL(blob);
+      agentCallAudio = new Audio(audioUrl);
+      agentCallAudio.volume = agentCallSpeaker ? 1.0 : 0.0;
+      agentCallAudio.onended = function() {
+        URL.revokeObjectURL(audioUrl);
+        if (callback) callback(true);
+      };
+      agentCallAudio.play().catch(function() { if (callback) callback(false); });
+    })
+    .catch(function(err) {
+      console.warn('Client ElevenLabs TTS failed, falling back to Web Speech:', err.message);
+      speakWithWebSpeech(text, function() { if (callback) callback(false); });
+    });
+  }
+
+  function speakAgentResponse(text, callback) {
+    if (agentCallSession && agentCallSession.elevenLabsKey && agentCallSession.voiceId) {
+      generateClientTTS(text, agentCallSession.voiceId, agentCallSession.elevenLabsKey, callback);
+    } else {
+      speakWithWebSpeech(text, callback);
     }
   }
 

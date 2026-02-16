@@ -482,44 +482,10 @@ export async function agentCallRoutes(app: FastifyInstance) {
     // Resolve ElevenLabs key: client → server env → none
     const elevenKey = body.elevenLabsKey || process.env.ELEVENLABS_API_KEY || '';
 
-    // Generate TTS for greeting if ElevenLabs key available
-    let greetingAudio = '';
-    let voiceEngine = 'web_speech';
-    if (elevenKey) {
-      try {
-        logger.info(`Generating ElevenLabs greeting TTS for agent ${agent.id} (voice: ${agent.voiceId}), keySource=${body.elevenLabsKey ? 'client' : 'server_env'}`);
-        const ttsResp = await axios.post(
-          `https://api.elevenlabs.io/v1/text-to-speech/${agent.voiceId}`,
-          {
-            text: agent.greeting,
-            model_id: 'eleven_multilingual_v2',
-            voice_settings: { stability: 0.5, similarity_boost: 0.8, style: 0.3, use_speaker_boost: true },
-          },
-          {
-            headers: {
-              'xi-api-key': elevenKey,
-              'Content-Type': 'application/json',
-              Accept: 'audio/mpeg',
-            },
-            responseType: 'arraybuffer',
-            timeout: 15000,
-          },
-        );
-        greetingAudio = Buffer.from(ttsResp.data).toString('base64');
-        voiceEngine = 'elevenlabs';
-        logger.info(`ElevenLabs TTS greeting generated (${greetingAudio.length} bytes base64)`);
-      } catch (e: any) {
-        logger.error('ElevenLabs TTS greeting FAILED:', {
-          status: e?.response?.status,
-          data: e?.response?.data ? Buffer.from(e.response.data).toString('utf8').substring(0, 300) : null,
-          message: e.message,
-          hint: e?.response?.status === 401 ? 'Invalid API key — check ELEVENLABS_API_KEY or the key on the Agent page' : '',
-        });
-        // Will fall back to Web Speech on the client
-      }
-    } else {
-      logger.info('No ElevenLabs key — using Web Speech fallback');
-    }
+    // For browser calls, we let the FRONTEND generate TTS directly from the user's browser.
+    // This avoids cloud IP abuse-detection blocks on ElevenLabs free tier.
+    // We pass the voiceId + key so the client can call the ElevenLabs API itself.
+    logger.info(`Browser call started: agent=${agent.id}, elevenLabsKey=${elevenKey ? 'available' : 'none'}, voiceId=${agent.voiceId}`);
 
     return reply.status(201).send({
       sessionId,
@@ -530,11 +496,12 @@ export async function agentCallRoutes(app: FastifyInstance) {
         avatar: agent.avatar,
         color1: agent.color1,
         color2: agent.color2,
+        voiceId: agent.voiceId,
+        voiceName: agent.voiceName,
       },
       greeting: agent.greeting,
-      greetingAudio,
-      greetingAudioType: 'audio/mpeg',
-      voiceEngine,
+      elevenLabsKey: elevenKey,
+      voiceEngine: elevenKey ? 'elevenlabs_client' : 'web_speech',
     });
   });
 
@@ -600,51 +567,9 @@ export async function agentCallRoutes(app: FastifyInstance) {
     const agentTime = new Date().toISOString();
     session.transcript.push({ role: 'agent', text: responseText, timestamp: agentTime });
 
-    // Generate TTS via ElevenLabs (session key → server env → skip)
-    let audioBase64 = '';
-    const msgElevenKey = session.elevenLabsKey || process.env.ELEVENLABS_API_KEY || '';
-    if (msgElevenKey) {
-      try {
-        // Clean up text for TTS: strip markdown, limit length, remove special chars
-        let ttsText = responseText
-          .replace(/```[\s\S]*?```/g, ' (code omitted) ')   // Remove code blocks
-          .replace(/[*_~`#>]/g, '')                          // Strip markdown chars
-          .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')          // Links → just text
-          .replace(/\n+/g, '. ')                             // Newlines → pauses
-          .replace(/\s+/g, ' ')                              // Collapse whitespace
-          .trim();
-        // ElevenLabs max ~5000 chars; truncate long responses
-        if (ttsText.length > 2000) {
-          ttsText = ttsText.substring(0, 1997) + '...';
-        }
-
-        logger.info(`ElevenLabs TTS message: voiceId=${agent.voiceId}, textLen=${ttsText.length}, keySource=${session.elevenLabsKey ? 'session' : 'env'}`);
-
-        const ttsResp = await axios.post(
-          `https://api.elevenlabs.io/v1/text-to-speech/${agent.voiceId}`,
-          {
-            text: ttsText,
-            model_id: 'eleven_multilingual_v2',
-            voice_settings: { stability: 0.5, similarity_boost: 0.8, style: 0.3, use_speaker_boost: true },
-          },
-          {
-            headers: {
-              'xi-api-key': msgElevenKey,
-              'Content-Type': 'application/json',
-              Accept: 'audio/mpeg',
-            },
-            responseType: 'arraybuffer',
-            timeout: 30000,
-          },
-        );
-        audioBase64 = Buffer.from(ttsResp.data).toString('base64');
-        logger.info(`ElevenLabs TTS message OK (${audioBase64.length} bytes base64)`);
-      } catch (e: any) {
-        const errBody = e?.response?.data ? Buffer.from(e.response.data).toString('utf8').substring(0, 500) : '';
-        logger.error(`ElevenLabs TTS message FAILED: status=${e?.response?.status}, msg=${e.message}, body=${errBody}`);
-        // Falls back to Web Speech on client side
-      }
-    }
+    // For browser calls, TTS is handled CLIENT-SIDE to avoid cloud IP blocks on ElevenLabs free tier.
+    // We just pass the voiceId so the frontend can generate TTS directly from user's browser.
+    const voiceId = agent.voiceId;
 
     // Run supervisor analysis and check for auto-escalation
     let autoEscalated = false;
@@ -682,8 +607,7 @@ export async function agentCallRoutes(app: FastifyInstance) {
 
     return {
       text: responseText,
-      audioBase64,
-      audioType: 'audio/mpeg',
+      voiceId,
       transcript: session.transcript,
       supervisorAlert: getLatestSupervisorAlert(session),
       autoEscalated,
