@@ -871,7 +871,6 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
                 </select>
                 <p style="font-size:10px;color:var(--text3);margin:4px 0 0;">Applies instantly to new phone calls and browser agent calls. Groq models are free.</p>
               </div>
-              </div>
             </div>
 
             <!-- Kaggle & ElevenLabs -->
