@@ -106,6 +106,8 @@ const AGENTS: AgentDef[] = [
 - Keep responses conversational and natural (2-4 sentences max for voice)
 - Address the user warmly, use encouraging phrases
 
+LANGUAGE: Detect the language the user is speaking. Always respond in the SAME language as the user. If they speak Hindi, respond in Hindi. If they speak Spanish, respond in Spanish. If unsure, respond in English. Be natural in whatever language you use.
+
 Remember: You are being spoken to via voice call. Keep responses concise and natural for speech.`,
     greeting: "Hi there, I'm Luna. I'm here to listen and support you. How are you feeling today?",
   },
@@ -129,6 +131,8 @@ Remember: You are being spoken to via voice call. Keep responses concise and nat
 - Be encouraging when users struggle with technical concepts
 - Keep responses concise for voice (2-4 sentences max)
 
+LANGUAGE: Detect the language the user is speaking. Always respond in the SAME language as the user. If they speak Hindi, respond in Hindi. If they speak Spanish, respond in Spanish. If unsure, respond in English. Be natural in whatever language you use.
+
 Remember: You are on a voice call. Be clear, structured, and brief. Number your steps when giving instructions.`,
     greeting: "Hey, I'm Atlas, your tech support specialist. What technical issue can I help you solve today?",
   },
@@ -150,6 +154,8 @@ Remember: You are on a voice call. Be clear, structured, and brief. Number your 
 - Keep the conversation light and engaging
 - If you don't know something, be honest and suggest alternatives
 - Keep responses natural and concise for voice (2-4 sentences max)
+
+LANGUAGE: Detect the language the user is speaking. Always respond in the SAME language as the user. If they speak Hindi, respond in Hindi. If they speak Spanish, respond in Spanish. If unsure, respond in English. Be natural in whatever language you use.
 
 Remember: You are on a voice call. Be energetic but clear. Keep it conversational.`,
     greeting: "Hey! I'm Nova, your go-to assistant. I'm here to help with anything you need. What can I do for you?",
@@ -173,6 +179,8 @@ Remember: You are on a voice call. Be energetic but clear. Keep it conversationa
 - Celebrate user strengths and progress
 - Challenge limiting beliefs gently
 - Keep responses impactful and concise for voice (2-4 sentences max)
+
+LANGUAGE: Detect the language the user is speaking. Always respond in the SAME language as the user. If they speak Hindi, respond in Hindi. If they speak Spanish, respond in Spanish. If unsure, respond in English. Be natural in whatever language you use.
 
 Remember: You are on a voice call. Be inspiring but practical. Ask one powerful question at a time.`,
     greeting: "Welcome, I'm Sage. I'm here to help you navigate your career and personal growth journey. What's on your mind today?",
@@ -225,9 +233,130 @@ interface CallSession {
   source: 'browser' | 'phone';  // Where the call originated
   callerPhone?: string;          // Phone number if from Twilio
   twilioCallSid?: string;        // Twilio Call SID for phone calls
+  detectedLanguage?: string;     // Twilio locale code e.g. 'hi-IN', 'es-ES'
 }
 
 const activeSessions: Map<string, CallSession> = new Map();
+
+// ─── Phone TTS Audio Cache ──────────────────────────────────────────────────
+// Stores ElevenLabs audio buffers temporarily so Twilio can fetch them via <Play>
+
+const audioCache: Map<string, { buffer: Buffer; createdAt: number }> = new Map();
+const AUDIO_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+// Clean up expired audio every 2 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [id, entry] of audioCache) {
+    if (now - entry.createdAt > AUDIO_CACHE_TTL_MS) audioCache.delete(id);
+  }
+}, 2 * 60 * 1000);
+
+/**
+ * Generate ElevenLabs TTS audio for phone calls.
+ * Returns a unique audio ID that can be served via /twilio/audio/:id.
+ * Returns null if ElevenLabs is unavailable.
+ */
+async function generatePhoneTTS(text: string, voiceId: string): Promise<string | null> {
+  const elevenKey = process.env.ELEVENLABS_API_KEY;
+  if (!elevenKey) return null;
+
+  try {
+    const ttsResp = await axios.post(
+      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
+      {
+        text,
+        model_id: 'eleven_multilingual_v2',
+        voice_settings: { stability: 0.5, similarity_boost: 0.8, style: 0.3, use_speaker_boost: true },
+        output_format: 'mp3_44100_64',
+      },
+      {
+        headers: { 'xi-api-key': elevenKey, 'Content-Type': 'application/json', Accept: 'audio/mpeg' },
+        responseType: 'arraybuffer',
+        timeout: 15000,
+      },
+    );
+    const audioId = `tts_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    audioCache.set(audioId, { buffer: Buffer.from(ttsResp.data), createdAt: Date.now() });
+    logger.info(`Phone TTS generated: ${audioId} (${text.substring(0, 50)}...)`);
+    return audioId;
+  } catch (e: any) {
+    logger.error('Phone ElevenLabs TTS failed:', e.message);
+    return null;
+  }
+}
+
+// ─── Language Detection & Mapping ───────────────────────────────────────────
+
+const LANG_TO_TWILIO_LOCALE: Record<string, string> = {
+  english: 'en-US', hindi: 'hi-IN', spanish: 'es-ES', french: 'fr-FR',
+  german: 'de-DE', italian: 'it-IT', portuguese: 'pt-BR', russian: 'ru-RU',
+  chinese: 'zh-CN', japanese: 'ja-JP', korean: 'ko-KR', arabic: 'ar-SA',
+  bengali: 'bn-IN', turkish: 'tr-TR', vietnamese: 'vi-VN', thai: 'th-TH',
+  dutch: 'nl-NL', polish: 'pl-PL', swedish: 'sv-SE', ukrainian: 'uk-UA',
+  tamil: 'ta-IN', telugu: 'te-IN', marathi: 'mr-IN', gujarati: 'gu-IN',
+  kannada: 'kn-IN', malayalam: 'ml-IN', punjabi: 'pa-IN', urdu: 'ur-PK',
+};
+
+const TWILIO_LOCALE_TO_NEURAL_VOICE: Record<string, string> = {
+  'en-US': 'Google.en-US-Neural2-F', 'hi-IN': 'Google.hi-IN-Neural2-A',
+  'es-ES': 'Google.es-ES-Neural2-A', 'fr-FR': 'Google.fr-FR-Neural2-A',
+  'de-DE': 'Google.de-DE-Neural2-C', 'it-IT': 'Google.it-IT-Neural2-A',
+  'pt-BR': 'Google.pt-BR-Neural2-A', 'ja-JP': 'Google.ja-JP-Neural2-B',
+  'ko-KR': 'Google.ko-KR-Neural2-A', 'zh-CN': 'Google.cmn-CN-Neural2-A',
+  'ar-SA': 'Google.ar-XA-Neural2-A', 'ru-RU': 'Google.ru-RU-Neural2-A',
+  'nl-NL': 'Google.nl-NL-Neural2-A', 'tr-TR': 'Google.tr-TR-Neural2-A',
+};
+
+function getFallbackVoice(locale?: string): string {
+  if (locale && TWILIO_LOCALE_TO_NEURAL_VOICE[locale]) {
+    return TWILIO_LOCALE_TO_NEURAL_VOICE[locale];
+  }
+  return 'Google.en-US-Neural2-F';
+}
+
+function detectLanguageFromText(text: string): string | null {
+  const lower = text.toLowerCase();
+  // Hindi detection (Devanagari script)
+  if (/[\u0900-\u097F]/.test(text)) return 'hindi';
+  // Arabic script
+  if (/[\u0600-\u06FF]/.test(text)) return 'arabic';
+  // Chinese characters
+  if (/[\u4e00-\u9fff]/.test(text)) return 'chinese';
+  // Japanese (Hiragana/Katakana)
+  if (/[\u3040-\u30ff]/.test(text)) return 'japanese';
+  // Korean (Hangul)
+  if (/[\uac00-\ud7af]/.test(text)) return 'korean';
+  // Bengali script
+  if (/[\u0980-\u09FF]/.test(text)) return 'bengali';
+  // Tamil script
+  if (/[\u0B80-\u0BFF]/.test(text)) return 'tamil';
+  // Telugu script
+  if (/[\u0C00-\u0C7F]/.test(text)) return 'telugu';
+  // Gujarati script
+  if (/[\u0A80-\u0AFF]/.test(text)) return 'gujarati';
+  // Cyrillic (Russian/Ukrainian)
+  if (/[\u0400-\u04FF]/.test(text)) return 'russian';
+  // Thai script
+  if (/[\u0E00-\u0E7F]/.test(text)) return 'thai';
+  // Common Spanish keywords
+  if (/\b(hola|cómo|estás|gracias|buenos|buenas|sí|por favor|qué|dónde)\b/i.test(text)) return 'spanish';
+  // Common French keywords
+  if (/\b(bonjour|merci|comment|oui|s'il vous plaît|je suis|au revoir)\b/i.test(text)) return 'french';
+  // Common German keywords
+  if (/\b(hallo|danke|wie geht|bitte|guten|ich bin|ja|nein)\b/i.test(text)) return 'german';
+  // Common Hindi in Roman script
+  if (/\b(namaste|kaise|hai|hain|kya|mujhe|aap|theek|accha|dhanyavaad|bahut|nahi)\b/i.test(text)) return 'hindi';
+  return null;
+}
+
+/** Build TwiML <Say> or <Play> depending on whether ElevenLabs audio is available */
+function buildTwimlSpeak(audioId: string | null, text: string, fallbackVoice: string, serverUrl: string): string {
+  if (audioId) {
+    return `<Play>${escapeXml(serverUrl)}/v1/agent-calls/twilio/audio/${audioId}</Play>`;
+  }
+  return `<Say voice="${escapeXml(fallbackVoice)}">${escapeXml(text)}</Say>`;
+}
 
 // ─── Persist helper ──────────────────────────────────────────────────────────
 
@@ -424,6 +553,12 @@ export async function agentCallRoutes(app: FastifyInstance) {
     // Add user message to transcript
     session.transcript.push({ role: 'user', text: body.text, timestamp: now });
 
+    // Detect language from user's text
+    const detLang = detectLanguageFromText(body.text);
+    if (detLang) {
+      session.detectedLanguage = LANG_TO_TWILIO_LOCALE[detLang] || 'en-US';
+    }
+
     // Build LLM messages
     const llmMessages: ChatMessage[] = [
       { role: 'system', content: agent.systemPrompt },
@@ -548,6 +683,7 @@ export async function agentCallRoutes(app: FastifyInstance) {
       supervisorAlert: getLatestSupervisorAlert(session),
       autoEscalated,
       autoEscalationMessage,
+      detectedLanguage: session.detectedLanguage || 'en-US',
     };
   });
 
@@ -710,6 +846,17 @@ export async function agentCallRoutes(app: FastifyInstance) {
     return true;
   }
 
+  // ═══ GET /twilio/audio/:id — Serve ElevenLabs TTS audio for phone calls ════
+  app.get('/twilio/audio/:id', async (request: any, reply) => {
+    const { id } = request.params as any;
+    const entry = audioCache.get(id);
+    if (!entry) {
+      return reply.status(404).send('Audio not found');
+    }
+    reply.type('audio/mpeg');
+    return reply.send(entry.buffer);
+  });
+
   // ═══ POST /twilio/incoming — Main entry: incoming call to Twilio number ════
   app.post('/twilio/incoming', async (request: any, reply) => {
     if (!twilioGuard(request, reply)) return;
@@ -721,15 +868,21 @@ export async function agentCallRoutes(app: FastifyInstance) {
     // IVR Menu: Press 1-4 for an agent
     const agentMenu = AGENTS.map((a, i) => `Press ${i + 1} for ${a.name}, ${a.specialty}.`).join(' ');
     const serverUrl = getSecureServerUrl();
+    const fallback = getFallbackVoice('en-US');
+
+    // Generate natural TTS for IVR greeting
+    const ivrText = `Welcome to Circle for Life AI Support. ${agentMenu} Or press 0 to speak with a real person.`;
+    const ivrAudio = await generatePhoneTTS(ivrText, AGENTS[2].voiceId); // Nova's voice for IVR
+    const promptAudio = await generatePhoneTTS('Please press a number now.', AGENTS[2].voiceId);
 
     reply.type('text/xml');
     return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="Polly.Joanna">Welcome to Circle for Life AI Support. ${escapeXml(agentMenu)} Or press 0 to speak with a real person.</Say>
+  ${buildTwimlSpeak(ivrAudio, ivrText, fallback, serverUrl)}
   <Gather numDigits="1" action="${escapeXml(serverUrl)}/v1/agent-calls/twilio/agent-select?from=${encodeURIComponent(callerPhone)}&amp;callSid=${encodeURIComponent(callSid)}" method="POST" timeout="10">
-    <Say voice="Polly.Joanna">Please press a number now.</Say>
+    ${buildTwimlSpeak(promptAudio, 'Please press a number now.', fallback, serverUrl)}
   </Gather>
-  <Say voice="Polly.Joanna">We didn't receive a selection. Goodbye.</Say>
+  <Say voice="${escapeXml(fallback)}">We didn't receive a selection. Goodbye.</Say>
 </Response>`;
   });
 
@@ -744,16 +897,19 @@ export async function agentCallRoutes(app: FastifyInstance) {
 
     logger.info(`Twilio agent select: digit=${digit}, caller=${callerPhone}`);
 
+    const fallback = getFallbackVoice('en-US');
+
     // Press 0 → dial admin directly
     if (digit === '0') {
       const adminPhone = process.env.ADMIN_PHONE_NUMBER;
       if (adminPhone) {
+        const connectAudio = await generatePhoneTTS('Connecting you to a real person now. Please hold.', AGENTS[2].voiceId);
         reply.type('text/xml');
         return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="Polly.Joanna">Connecting you to a real person now. Please hold.</Say>
+  ${buildTwimlSpeak(connectAudio, 'Connecting you to a real person now. Please hold.', fallback, serverUrl)}
   <Dial callerId="${escapeXml(process.env.TWILIO_PHONE_NUMBER || '')}">${escapeXml(adminPhone)}</Dial>
-  <Say voice="Polly.Joanna">The call could not be connected. Please try again later. Goodbye.</Say>
+  <Say voice="${escapeXml(fallback)}">The call could not be connected. Please try again later. Goodbye.</Say>
 </Response>`;
       }
     }
@@ -765,7 +921,7 @@ export async function agentCallRoutes(app: FastifyInstance) {
       reply.type('text/xml');
       return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="Polly.Joanna">Invalid selection. Goodbye.</Say>
+  <Say voice="${escapeXml(fallback)}">Invalid selection. Goodbye.</Say>
 </Response>`;
     }
 
@@ -799,17 +955,22 @@ export async function agentCallRoutes(app: FastifyInstance) {
     activeSessions.set(sessionId, session);
     logger.info(`Phone session created: ${sessionId} with agent ${agent.name} for ${callerPhone}`);
 
-    // Say the greeting and start listening
+    // Generate natural TTS for agent greeting
+    const introText = `You are now connected with ${agent.name}, ${agent.specialty}.`;
+    const introAudio = await generatePhoneTTS(introText, agent.voiceId);
+    const greetAudio = await generatePhoneTTS(agent.greeting, agent.voiceId);
+    const listenAudio = await generatePhoneTTS("Go ahead, I'm listening.", agent.voiceId);
+
     reply.type('text/xml');
     return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="Polly.Joanna">You are now connected with ${escapeXml(agent.name)}, ${escapeXml(agent.specialty)}.</Say>
+  ${buildTwimlSpeak(introAudio, introText, fallback, serverUrl)}
   <Pause length="1"/>
-  <Say voice="Polly.Joanna">${escapeXml(agent.greeting)}</Say>
+  ${buildTwimlSpeak(greetAudio, agent.greeting, fallback, serverUrl)}
   <Gather input="speech" speechTimeout="auto" action="${escapeXml(serverUrl)}/v1/agent-calls/twilio/converse?session=${encodeURIComponent(sessionId)}" method="POST" timeout="15">
-    <Say voice="Polly.Joanna">Go ahead, I'm listening.</Say>
+    ${buildTwimlSpeak(listenAudio, "Go ahead, I'm listening.", fallback, serverUrl)}
   </Gather>
-  <Say voice="Polly.Joanna">I didn't hear anything. If you'd like to continue, please call back. Goodbye.</Say>
+  <Say voice="${escapeXml(fallback)}">I didn't hear anything. If you'd like to continue, please call back. Goodbye.</Say>
 </Response>`;
   });
 
@@ -822,40 +983,54 @@ export async function agentCallRoutes(app: FastifyInstance) {
     const serverUrl = getSecureServerUrl();
 
     const session = sessionId ? activeSessions.get(sessionId) : null;
+    const agent = session ? AGENTS.find(a => a.id === session.agentId)! : null;
+    const sessionLang = session?.detectedLanguage || 'en-US';
+    const fallback = getFallbackVoice(sessionLang);
+    const gatherLang = sessionLang !== 'en-US' ? ` language="${sessionLang}"` : '';
+
     if (!session || session.status !== 'active') {
       reply.type('text/xml');
       return `<?xml version="1.0" encoding="UTF-8"?>
-<Response><Say voice="Polly.Joanna">Session ended. Goodbye.</Say></Response>`;
+<Response><Say voice="${escapeXml(fallback)}">Session ended. Goodbye.</Say></Response>`;
     }
 
     if (!speechResult.trim()) {
-      // No speech detected — prompt again
+      const promptAudio = agent ? await generatePhoneTTS("I'm still here. Please go ahead.", agent.voiceId) : null;
       reply.type('text/xml');
       return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Gather input="speech" speechTimeout="auto" action="${escapeXml(serverUrl)}/v1/agent-calls/twilio/converse?session=${encodeURIComponent(sessionId)}" method="POST" timeout="15">
-    <Say voice="Polly.Joanna">I'm still here. Please go ahead.</Say>
+  <Gather input="speech" speechTimeout="auto"${gatherLang} action="${escapeXml(serverUrl)}/v1/agent-calls/twilio/converse?session=${encodeURIComponent(sessionId)}" method="POST" timeout="15">
+    ${buildTwimlSpeak(promptAudio, "I'm still here. Please go ahead.", fallback, serverUrl)}
   </Gather>
-  <Say voice="Polly.Joanna">I didn't hear anything. Goodbye.</Say>
+  <Say voice="${escapeXml(fallback)}">I didn't hear anything. Goodbye.</Say>
 </Response>`;
     }
 
     logger.info(`Phone converse [${sessionId}]: "${speechResult}"`);
+
+    // Detect language from user's speech and store in session
+    const detectedLang = detectLanguageFromText(speechResult);
+    if (detectedLang) {
+      const locale = LANG_TO_TWILIO_LOCALE[detectedLang] || 'en-US';
+      session.detectedLanguage = locale;
+      logger.info(`Language detected: ${detectedLang} → ${locale} for session ${sessionId}`);
+    }
+    const currentLang = session.detectedLanguage || 'en-US';
+    const currentFallback = getFallbackVoice(currentLang);
+    const currentGatherLang = currentLang !== 'en-US' ? ` language="${currentLang}"` : '';
 
     // Add user message
     const userTime = new Date().toISOString();
     session.transcript.push({ role: 'user', text: speechResult, timestamp: userTime });
 
     // Get AI response
-    const agent = AGENTS.find(a => a.id === session.agentId)!;
     let responseText = "I'm sorry, I couldn't process that. Could you try again?";
-
     let llmFailed = false;
 
     if (session.providerConfig && session.providerConfig.apiKey) {
       try {
         const messages: ChatMessage[] = [
-          { role: 'system', content: agent.systemPrompt },
+          { role: 'system', content: agent!.systemPrompt },
           ...session.transcript.filter(t => t.role !== 'system').map(t => ({
             role: t.role === 'agent' ? 'assistant' as const : 'user' as const,
             content: t.text,
@@ -867,7 +1042,7 @@ export async function agentCallRoutes(app: FastifyInstance) {
         const resp = await ControlPanelService.chat({
           provider: session.providerConfig,
           messages,
-          maxTokens: 250,  // Shorter for phone (faster TTS)
+          maxTokens: 250,
           temperature: 0.7,
         });
         responseText = resp.content;
@@ -891,19 +1066,22 @@ export async function agentCallRoutes(app: FastifyInstance) {
       });
       logger.info(`Phone call LLM-failed escalation: ${sessionId} → ${adminPhone || 'NO ADMIN PHONE'}`);
 
+      const escalateText = "I'm experiencing a technical issue. Let me connect you with a real person right away. Please hold.";
+      const escalateAudio = agent ? await generatePhoneTTS(escalateText, agent.voiceId) : null;
+
       if (adminPhone) {
         reply.type('text/xml');
         return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="Polly.Joanna">I'm experiencing a technical issue. Let me connect you with a real person right away. Please hold.</Say>
+  ${buildTwimlSpeak(escalateAudio, escalateText, currentFallback, serverUrl)}
   <Dial callerId="${escapeXml(process.env.TWILIO_PHONE_NUMBER || '')}" timeout="30">${escapeXml(adminPhone)}</Dial>
-  <Say voice="Polly.Joanna">I'm sorry, the call could not be connected. Please try again later. Goodbye.</Say>
+  <Say voice="${escapeXml(currentFallback)}">I'm sorry, the call could not be connected. Please try again later. Goodbye.</Say>
 </Response>`;
       } else {
         reply.type('text/xml');
         return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="Polly.Joanna">I'm sorry, I'm having technical difficulties and no support staff is available right now. Please try again later. Goodbye.</Say>
+  <Say voice="${escapeXml(currentFallback)}">I'm sorry, I'm having technical difficulties and no support staff is available right now. Please try again later. Goodbye.</Say>
 </Response>`;
       }
     }
@@ -920,7 +1098,6 @@ export async function agentCallRoutes(app: FastifyInstance) {
     const shouldEscalate = latestNote && latestNote.escalationNeeded && latestNote.severity === 'high';
 
     if (shouldEscalate) {
-      // Auto-escalate: connect to admin phone
       const adminPhone = process.env.ADMIN_PHONE_NUMBER;
       session.status = 'escalated';
       session.transcript.push({
@@ -930,28 +1107,35 @@ export async function agentCallRoutes(app: FastifyInstance) {
       });
       logger.info(`Phone call auto-escalated: ${sessionId}`);
 
+      // Generate TTS for escalation
+      const respAudio = agent ? await generatePhoneTTS(responseText, agent.voiceId) : null;
+      const holdText = "I'm going to connect you with a real person who can help. Please hold.";
+      const holdAudio = agent ? await generatePhoneTTS(holdText, agent.voiceId) : null;
+
       if (adminPhone) {
         reply.type('text/xml');
         return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="Polly.Joanna">${escapeXml(responseText)}</Say>
+  ${buildTwimlSpeak(respAudio, responseText, currentFallback, serverUrl)}
   <Pause length="1"/>
-  <Say voice="Polly.Joanna">I'm going to connect you with a real person who can help. Please hold.</Say>
+  ${buildTwimlSpeak(holdAudio, holdText, currentFallback, serverUrl)}
   <Dial callerId="${escapeXml(process.env.TWILIO_PHONE_NUMBER || '')}">${escapeXml(adminPhone)}</Dial>
-  <Say voice="Polly.Joanna">The call could not be connected. Please try calling back. Goodbye.</Say>
+  <Say voice="${escapeXml(currentFallback)}">The call could not be connected. Please try calling back. Goodbye.</Say>
 </Response>`;
       }
     }
 
-    // Normal response: say the AI response and gather more speech
+    // Normal response: generate natural TTS and gather more speech
+    const responseAudio = agent ? await generatePhoneTTS(responseText, agent.voiceId) : null;
+
     reply.type('text/xml');
     return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="Polly.Joanna">${escapeXml(responseText)}</Say>
-  <Gather input="speech" speechTimeout="auto" action="${escapeXml(serverUrl)}/v1/agent-calls/twilio/converse?session=${encodeURIComponent(sessionId)}" method="POST" timeout="20">
+  ${buildTwimlSpeak(responseAudio, responseText, currentFallback, serverUrl)}
+  <Gather input="speech" speechTimeout="auto"${currentGatherLang} action="${escapeXml(serverUrl)}/v1/agent-calls/twilio/converse?session=${encodeURIComponent(sessionId)}" method="POST" timeout="20">
     <Pause length="1"/>
   </Gather>
-  <Say voice="Polly.Joanna">I haven't heard from you in a while. If you need more help, please call back. Goodbye.</Say>
+  <Say voice="${escapeXml(currentFallback)}">I haven't heard from you in a while. If you need more help, please call back. Goodbye.</Say>
 </Response>`;
   });
 
@@ -972,12 +1156,13 @@ export async function agentCallRoutes(app: FastifyInstance) {
       sayText += 'Please review the full transcript in the admin panel.';
     }
 
+    const escalationFallback = getFallbackVoice('en-US');
     reply.type('text/xml');
     return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="alice">${escapeXml(sayText)}</Say>
+  <Say voice="${escapeXml(escalationFallback)}">${escapeXml(sayText)}</Say>
   <Pause length="2"/>
-  <Say voice="alice">The full transcript is available in the Circle for Life admin panel. Goodbye.</Say>
+  <Say voice="${escapeXml(escalationFallback)}">The full transcript is available in the Circle for Life admin panel. Goodbye.</Say>
 </Response>`;
   });
 

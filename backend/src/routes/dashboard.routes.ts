@@ -5951,6 +5951,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
   var agentCallAudio = null;          // Audio element for TTS playback
   var agentCallAnalyser = null;       // Audio analyser for waveform
   var agentCallMicStream = null;
+  var agentCallLang = 'en-US';       // Dynamic STT language (updates on detection)
   var agentAdminPollTimer = null;
 
   function loadAgentPage() {
@@ -6166,7 +6167,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     agentCallRecognition = new SpeechRecognition();
     agentCallRecognition.continuous = false;
     agentCallRecognition.interimResults = true;
-    agentCallRecognition.lang = 'en-US';
+    agentCallRecognition.lang = agentCallLang;
 
     agentCallListening = true;
     document.getElementById('callStatus').textContent = 'Listening...';
@@ -6261,6 +6262,12 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
 
     try {
       var d = await api('POST', '/v1/agent-calls/' + agentCallSession.id + '/message', { text: text });
+
+      // Update STT language if server detected a different language
+      if (d.detectedLanguage && d.detectedLanguage !== agentCallLang) {
+        agentCallLang = d.detectedLanguage;
+        console.log('STT language switched to:', agentCallLang);
+      }
 
       appendCallMessage('agent', d.text);
 
