@@ -846,6 +846,32 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
                   <input type="password" class="form-input" id="cfgDefaultKey" placeholder="API key for default provider" style="font-size:13px;">
                 </div>
               </div>
+              <div style="margin-top:12px;">
+                <label style="font-size:11px;font-weight:600;color:var(--text3);display:block;margin-bottom:4px;">Phone Call LLM Model</label>
+                <select class="form-input" id="cfgPhoneModel" style="font-size:13px;">
+                  <option value="">Auto-detect (default)</option>
+                  <optgroup label="Groq (Free)">
+                    <option value="llama-3.1-8b-instant">llama-3.1-8b-instant (Fast, English-focused)</option>
+                    <option value="llama-3.3-70b-versatile">llama-3.3-70b-versatile (Best multilingual)</option>
+                    <option value="gemma2-9b-it">gemma2-9b-it (Good balance)</option>
+                    <option value="mixtral-8x7b-32768">mixtral-8x7b-32768 (32K context)</option>
+                  </optgroup>
+                  <optgroup label="OpenAI">
+                    <option value="gpt-4o-mini">gpt-4o-mini</option>
+                    <option value="gpt-4o">gpt-4o</option>
+                  </optgroup>
+                  <optgroup label="Anthropic">
+                    <option value="claude-3-haiku-20240307">claude-3-haiku (Fast)</option>
+                    <option value="claude-3-5-sonnet-20241022">claude-3.5-sonnet (Best)</option>
+                  </optgroup>
+                  <optgroup label="Google">
+                    <option value="gemini-1.5-flash">gemini-1.5-flash</option>
+                    <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+                  </optgroup>
+                </select>
+                <p style="font-size:10px;color:var(--text3);margin:4px 0 0;">Applies instantly to new phone calls and browser agent calls. Groq models are free.</p>
+              </div>
+              </div>
             </div>
 
             <!-- Kaggle & ElevenLabs -->
@@ -2509,6 +2535,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     'cfgMistralKey': 'MISTRAL_API_KEY',
     'cfgDefaultProvider': 'DEFAULT_LLM_PROVIDER',
     'cfgDefaultKey': 'DEFAULT_LLM_KEY',
+    'cfgPhoneModel': 'PHONE_LLM_MODEL',
     'cfgKaggleUrl': 'KAGGLE_OLLAMA_URL',
     'cfgElevenLabsKey': 'ELEVENLABS_API_KEY',
     'cfgServerUrl': 'SERVER_URL',

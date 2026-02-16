@@ -472,6 +472,11 @@ export async function agentCallRoutes(app: FastifyInstance) {
       source: 'browser',
     };
 
+    // Apply admin-panel model override to browser calls too
+    if (process.env.PHONE_LLM_MODEL && session.providerConfig) {
+      session.providerConfig.model = process.env.PHONE_LLM_MODEL;
+    }
+
     activeSessions.set(sessionId, session);
 
     // Resolve ElevenLabs key: client → server env → none
@@ -1484,6 +1489,7 @@ export async function agentCallRoutes(app: FastifyInstance) {
       MISTRAL_API_KEY: mask(process.env.MISTRAL_API_KEY),
       DEFAULT_LLM_PROVIDER: process.env.DEFAULT_LLM_PROVIDER || '',
       DEFAULT_LLM_KEY: mask(process.env.DEFAULT_LLM_KEY),
+      PHONE_LLM_MODEL: process.env.PHONE_LLM_MODEL || '',
       KAGGLE_OLLAMA_URL: process.env.KAGGLE_OLLAMA_URL || '',
       ELEVENLABS_API_KEY: mask(process.env.ELEVENLABS_API_KEY),
       SERVER_URL: process.env.SERVER_URL || '',
@@ -1500,7 +1506,7 @@ export async function agentCallRoutes(app: FastifyInstance) {
       'GROQ_API_KEY', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY',
       'GOOGLE_API_KEY', 'OPENROUTER_API_KEY', 'TOGETHER_API_KEY',
       'DEEPSEEK_API_KEY', 'MISTRAL_API_KEY',
-      'DEFAULT_LLM_PROVIDER', 'DEFAULT_LLM_KEY',
+      'DEFAULT_LLM_PROVIDER', 'DEFAULT_LLM_KEY', 'PHONE_LLM_MODEL',
       'KAGGLE_OLLAMA_URL', 'ELEVENLABS_API_KEY', 'SERVER_URL',
     ];
 
@@ -1684,13 +1690,16 @@ function escapeXml(str: string): string {
 // or falls back to the Kaggle/Ollama setup.
 
 function getPhoneCallProvider(): ProviderConfig | null {
+  // Admin-panel model override: applies to whichever provider is resolved below
+  const modelOverride = process.env.PHONE_LLM_MODEL || '';
+
   // Priority 1: Dedicated phone LLM provider env vars
   if (process.env.PHONE_LLM_PROVIDER && process.env.PHONE_LLM_API_KEY) {
     logger.info('Phone LLM: using dedicated PHONE_LLM_PROVIDER=' + process.env.PHONE_LLM_PROVIDER);
     return {
       provider: process.env.PHONE_LLM_PROVIDER as any,
       apiKey: process.env.PHONE_LLM_API_KEY,
-      model: process.env.PHONE_LLM_MODEL,
+      model: modelOverride || process.env.PHONE_LLM_MODEL,
       baseUrl: process.env.PHONE_LLM_BASE_URL,
     };
   }
@@ -1698,11 +1707,11 @@ function getPhoneCallProvider(): ProviderConfig | null {
   // Priority 2: Explicit default provider
   if (process.env.DEFAULT_LLM_KEY) {
     const prov = process.env.DEFAULT_LLM_PROVIDER || 'groq';
-    logger.info('Phone LLM: using DEFAULT_LLM_KEY with provider=' + prov);
+    logger.info('Phone LLM: using DEFAULT_LLM_KEY with provider=' + prov + (modelOverride ? ', model=' + modelOverride : ''));
     return {
       provider: prov as any,
       apiKey: process.env.DEFAULT_LLM_KEY,
-      model: process.env.DEFAULT_LLM_MODEL,
+      model: modelOverride || process.env.DEFAULT_LLM_MODEL,
     };
   }
 
@@ -1720,11 +1729,12 @@ function getPhoneCallProvider(): ProviderConfig | null {
 
   for (const d of autoDetect) {
     if (process.env[d.env]) {
-      logger.info(`Phone LLM: auto-detected ${d.env} → provider=${d.provider}`);
+      const chosenModel = modelOverride || d.model;
+      logger.info(`Phone LLM: auto-detected ${d.env} → provider=${d.provider}, model=${chosenModel}`);
       return {
         provider: d.provider as any,
         apiKey: process.env[d.env]!,
-        model: d.model,
+        model: chosenModel,
       };
     }
   }
