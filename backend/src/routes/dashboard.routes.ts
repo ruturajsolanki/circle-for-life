@@ -6359,8 +6359,8 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
   // ── Client-side ElevenLabs TTS (runs from user's browser, avoids cloud IP blocks) ──
   function generateClientTTS(text, voiceId, apiKey, callback) {
     var ttsText = text
-      .replace(/```[\s\S]*?```/g, ' (code omitted) ')
-      .replace(/[*_~`#>]/g, '')
+      .replace(/\x60{3}[\s\S]*?\x60{3}/g, ' (code omitted) ')
+      .replace(/[*_~\x60#>]/g, '')
       .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
       .replace(/\n+/g, '. ')
       .replace(/\s+/g, ' ')
