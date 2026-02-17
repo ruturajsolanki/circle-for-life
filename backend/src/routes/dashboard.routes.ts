@@ -6233,21 +6233,13 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
       transcript.innerHTML = '';
       appendCallMessage('agent', d.greeting);
 
-      // Play greeting: client-side ElevenLabs TTS or Web Speech fallback
-      console.log('Agent call TTS config:', { voiceId: agentCallSession.voiceId, hasKey: !!agentCallSession.elevenLabsKey, keyLen: (agentCallSession.elevenLabsKey||'').length, voiceEngine: d.voiceEngine });
-      if (agentCallSession.elevenLabsKey && agentCallSession.voiceId) {
-        setCallStatus('Speaking...', 'speaking');
-        generateClientTTS(d.greeting, agentCallSession.voiceId, agentCallSession.elevenLabsKey, function(ok) {
-          setCallStatus('Listening...', 'listening');
-          startAgentListening();
-        });
-      } else {
-        setCallStatus('Speaking...', 'speaking');
-        speakWithWebSpeech(d.greeting, function() {
-          setCallStatus('Listening...', 'listening');
-          startAgentListening();
-        });
-      }
+      // Play greeting using the unified voice pipeline (Deepgram > ElevenLabs > Web Speech)
+      console.log('Agent call TTS config:', { voiceEngine: d.voiceEngine, deepgramKey: !!agentCallSession.deepgramKey, deepgramVoice: agentCallSession.deepgramVoice, elevenLabsKey: !!agentCallSession.elevenLabsKey, voiceId: agentCallSession.voiceId });
+      setCallStatus('Speaking...', 'speaking');
+      speakAgentResponse(d.greeting, function() {
+        setCallStatus('Listening...', 'listening');
+        startAgentListening();
+      });
 
     } catch(e) {
       toast('Failed to start call: ' + e.message, 'err');
@@ -6574,7 +6566,9 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
       .replace(/  +/g, ' ')
       .trim();
     if (ttsText.length > 2000) ttsText = ttsText.substring(0, 1997) + '...';
-    if (!ttsText) { if (callback) callback(false); return; }
+    if (!ttsText) { console.warn('Deepgram TTS: empty text, skipping'); if (callback) callback(false); return; }
+
+    console.log('Deepgram TTS: requesting voice=' + deepgramVoice + ', textLen=' + ttsText.length + ', keyLen=' + (deepgramKey||'').length);
 
     fetch('https://api.deepgram.com/v1/speak?model=' + encodeURIComponent(deepgramVoice) + '&encoding=mp3', {
       method: 'POST',
@@ -6585,10 +6579,15 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
       body: JSON.stringify({ text: ttsText }),
     })
     .then(function(resp) {
-      if (!resp.ok) throw new Error('Deepgram TTS failed: ' + resp.status);
+      console.log('Deepgram TTS response:', resp.status, resp.statusText);
+      if (!resp.ok) {
+        return resp.text().then(function(t) { throw new Error('Deepgram TTS ' + resp.status + ': ' + t.substring(0,200)); });
+      }
       return resp.blob();
     })
     .then(function(blob) {
+      console.log('Deepgram TTS: got audio blob, size=' + blob.size + ', type=' + blob.type);
+      if (blob.size < 100) { throw new Error('Deepgram TTS returned empty/tiny audio (' + blob.size + ' bytes)'); }
       var audioUrl = URL.createObjectURL(blob);
       agentCallAudio = new Audio(audioUrl);
       agentCallAudio.volume = agentCallSpeaker ? 1.0 : 0.0;
@@ -6596,7 +6595,15 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
         URL.revokeObjectURL(audioUrl);
         if (callback) callback(true);
       };
-      agentCallAudio.play().catch(function() { if (callback) callback(false); });
+      agentCallAudio.onerror = function(e) {
+        console.error('Deepgram TTS: audio playback error', e);
+        URL.revokeObjectURL(audioUrl);
+        speakWithWebSpeech(text, function() { if (callback) callback(false); });
+      };
+      agentCallAudio.play().catch(function(e) {
+        console.warn('Deepgram TTS: play() rejected:', e.message);
+        speakWithWebSpeech(text, function() { if (callback) callback(false); });
+      });
     })
     .catch(function(err) {
       console.warn('Deepgram TTS failed, falling back:', err.message);
