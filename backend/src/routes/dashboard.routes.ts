@@ -1773,6 +1773,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
         <div style="flex:1;"></div>
         <input type="text" class="form-input" id="callLogSearch" placeholder="Search calls..." oninput="filterCallLogs()" style="max-width:220px;font-size:12px;padding:6px 12px;">
         <button class="btn-small" onclick="loadCallLogs()" title="Refresh">&#x21bb; Refresh</button>
+        <button class="btn-small" style="background:transparent;color:#ef4444;border:1px solid rgba(239,68,68,0.3);" onclick="deleteAllCallLogs()" title="Delete all logs">&#x1f5d1; Clear All</button>
       </div>
 
       <!-- Stats Row -->
@@ -1818,9 +1819,10 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
           </div>
           <!-- Supervisor Notes -->
           <div id="callDetailSupervisor" style="display:none;padding:16px 24px;border-top:1px solid var(--border);"></div>
-          <!-- Close -->
-          <div style="padding:16px 24px;border-top:1px solid var(--border);text-align:center;">
+          <!-- Actions -->
+          <div style="padding:16px 24px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:center;gap:12px;">
             <button class="btn-primary" onclick="document.getElementById('callDetailOverlay').style.display='none'" style="padding:10px 40px;">Close</button>
+            <button id="callDetailDeleteBtn" class="btn-small" style="padding:10px 20px;background:transparent;color:#ef4444;border:1px solid rgba(239,68,68,0.3);font-size:12px;font-weight:600;" onclick="">Delete Log</button>
           </div>
         </div>
       </div>
@@ -6975,9 +6977,12 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
           '<td style="padding:10px;font-size:12px;color:var(--text2);">' + dur + '</td>' +
           '<td style="padding:10px;font-size:12px;color:var(--text2);">' + c.messageCount + '</td>' +
           '<td style="padding:10px;font-size:11px;color:var(--text3);">' + new Date(c.startedAt).toLocaleString() + '</td>' +
-          '<td style="padding:10px;display:flex;gap:4px;">' +
+          '<td style="padding:10px;display:flex;gap:4px;align-items:center;">' +
             '<button class="btn-small" style="font-size:10px;padding:3px 10px;" onclick="event.stopPropagation();viewCallDetail(' + idx + ')">View</button>' +
             (c.status === 'active' ? '<button class="btn-small" style="font-size:10px;padding:3px 10px;background:var(--red);color:#fff;" onclick="event.stopPropagation();forceEndCall(\\'' + esc(c.id) + '\\')">End</button>' : '') +
+            '<button class="btn-small" style="font-size:10px;padding:3px 10px;background:transparent;color:var(--text3);border:1px solid var(--border);" onmouseover="this.style.color=\\'#ef4444\\';this.style.borderColor=\\'#ef4444\\'" onmouseout="this.style.color=\\'var(--text3)\\';this.style.borderColor=\\'var(--border)\\'" onclick="event.stopPropagation();deleteCallLog(\\'' + esc(c.id) + '\\')" title="Delete this log">' +
+              '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>' +
+            '</button>' +
           '</td>' +
         '</tr>';
       }).join('') +
@@ -7084,6 +7089,9 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
       supEl.style.display = 'none';
     }
 
+    var delBtn = document.getElementById('callDetailDeleteBtn');
+    if (delBtn) delBtn.onclick = function() { deleteCallLog(c.id); };
+
     document.getElementById('callDetailOverlay').style.display = '';
   }
 
@@ -7092,12 +7100,46 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     try {
       await api('POST', '/v1/agent-calls/admin/force-end/' + sessionId);
       toast('Call force-ended successfully', 'ok');
-      // Close detail overlay if open
       document.getElementById('callDetailOverlay').style.display = 'none';
-      // Refresh call logs
       loadCallLogs();
     } catch (e) {
       toast('Failed to end call: ' + (e.error || e.message), 'err');
+    }
+  }
+
+  async function deleteCallLog(callId) {
+    if (!confirm('Delete this call log permanently?')) return;
+    try {
+      await api('DELETE', '/v1/agent-calls/admin/call-logs/' + callId);
+      toast('Call log deleted', 'ok');
+      document.getElementById('callDetailOverlay').style.display = 'none';
+      _callLogsData = _callLogsData.filter(function(c) { return c.id !== callId; });
+      document.getElementById('clStatTotal').textContent = _callLogsData.length;
+      document.getElementById('clStatPhone').textContent = _callLogsData.filter(function(c) { return c.source === 'phone'; }).length;
+      document.getElementById('clStatBrowser').textContent = _callLogsData.filter(function(c) { return c.source === 'browser'; }).length;
+      document.getElementById('clStatEscalated').textContent = _callLogsData.filter(function(c) { return c.status === 'escalated'; }).length;
+      document.getElementById('clStatActive').textContent = _callLogsData.filter(function(c) { return c.status === 'active'; }).length;
+      renderCallLogs();
+    } catch (e) {
+      toast('Failed to delete: ' + (e.error || e.message), 'err');
+    }
+  }
+
+  async function deleteAllCallLogs() {
+    if (!confirm('Delete ALL call logs? This cannot be undone.')) return;
+    if (!confirm('Are you sure? This will permanently delete all call history.')) return;
+    try {
+      await api('DELETE', '/v1/agent-calls/admin/call-logs');
+      toast('All call logs cleared', 'ok');
+      _callLogsData = [];
+      document.getElementById('clStatTotal').textContent = '0';
+      document.getElementById('clStatPhone').textContent = '0';
+      document.getElementById('clStatBrowser').textContent = '0';
+      document.getElementById('clStatEscalated').textContent = '0';
+      document.getElementById('clStatActive').textContent = '0';
+      renderCallLogs();
+    } catch (e) {
+      toast('Failed to clear logs: ' + (e.error || e.message), 'err');
     }
   }
 

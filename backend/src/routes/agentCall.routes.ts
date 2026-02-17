@@ -1323,6 +1323,57 @@ export async function agentCallRoutes(app: FastifyInstance) {
     return { logs };
   });
 
+  // ═══ DELETE /admin/call-logs/:id — Admin: delete a call log ════════════════
+  app.delete('/admin/call-logs/:id', {
+    preHandler: [localAuthenticate, requirePermission('users.list')],
+  }, async (request: any, reply) => {
+    const { id } = request.params;
+    if (!id) return reply.status(400).send({ error: 'Missing call log id' });
+
+    // Remove from in-memory active sessions
+    if (activeSessions.has(id)) {
+      activeSessions.delete(id);
+    }
+
+    // Remove from database
+    try {
+      const { agentCallSessionsDB } = await import('../db/index.js');
+      await agentCallSessionsDB.deleteById(id);
+    } catch (e: any) {
+      logger.warn('Could not delete call log from DB:', e.message);
+    }
+
+    return { ok: true, deleted: id };
+  });
+
+  // ═══ DELETE /admin/call-logs — Admin: delete all call logs ═════════════════
+  app.delete('/admin/call-logs', {
+    preHandler: [localAuthenticate, requirePermission('users.list')],
+  }, async (_request: any) => {
+    // Clear in-memory ended sessions (keep active ones)
+    for (const [id, sess] of activeSessions) {
+      if (sess.status !== 'active') {
+        activeSessions.delete(id);
+      }
+    }
+
+    // Clear from database
+    try {
+      const { agentCallSessionsDB } = await import('../db/index.js');
+      const allRows = await agentCallSessionsDB.findAll();
+      let deleted = 0;
+      for (const row of allRows) {
+        await agentCallSessionsDB.deleteById(row.id);
+        deleted++;
+      }
+      logger.info(`Deleted ${deleted} call logs from DB`);
+    } catch (e: any) {
+      logger.warn('Could not clear call logs from DB:', e.message);
+    }
+
+    return { ok: true };
+  });
+
   // ═══ GET /admin/active — Admin: view all active calls ═════════════════════
   app.get('/admin/active', {
     preHandler: [localAuthenticate, requirePermission('users.list')],
