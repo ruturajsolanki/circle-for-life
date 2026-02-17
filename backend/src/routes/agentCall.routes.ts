@@ -80,6 +80,7 @@ export interface AgentDef {
   color2: string;        // gradient end
   voiceId: string;       // ElevenLabs voice ID
   voiceName: string;
+  deepgramVoice: string; // Deepgram Aura voice model
   systemPrompt: string;
   greeting: string;      // First message when call starts
 }
@@ -95,6 +96,7 @@ const AGENTS: AgentDef[] = [
     color2: '#6366F1',
     voiceId: '21m00Tcm4TlvDq8ikWAM', // Rachel
     voiceName: 'Rachel',
+    deepgramVoice: 'aura-asteria-en',
     systemPrompt: `You are Luna, an emotional support AI agent for the Circle for Life platform. Your personality:
 - Deeply empathetic, warm, and gentle
 - Use active listening: reflect back what the user says, validate their feelings
@@ -121,6 +123,7 @@ VOICE FORMAT: You are on a voice call. Your text will be read aloud by a text-to
     color2: '#1D4ED8',
     voiceId: 'pNInz6obpgDQGcFmaJgB', // Adam
     voiceName: 'Adam',
+    deepgramVoice: 'aura-orion-en',
     systemPrompt: `You are Atlas, a tech support AI agent for the Circle for Life platform. Your personality:
 - Patient, methodical, and knowledgeable
 - Break down complex problems into simple steps
@@ -146,6 +149,7 @@ VOICE FORMAT: You are on a voice call. Your text will be read aloud by a text-to
     color2: '#D97706',
     voiceId: 'EXAVITQu4vr4xnSDxMaL', // Bella
     voiceName: 'Bella',
+    deepgramVoice: 'aura-luna-en',
     systemPrompt: `You are Nova, a general assistant AI agent for the Circle for Life platform. Your personality:
 - Friendly, upbeat, and enthusiastic
 - Helpful and resourceful — always ready to find an answer
@@ -170,6 +174,7 @@ VOICE FORMAT: You are on a voice call. Your text will be read aloud by a text-to
     color2: '#059669',
     voiceId: 'ErXwobaYiN019PkySvjV', // Antoni
     voiceName: 'Antoni',
+    deepgramVoice: 'aura-perseus-en',
     systemPrompt: `You are Sage, a career and life coaching AI agent for the Circle for Life platform. Your personality:
 - Wise, motivational, and insightful
 - Ask powerful, thought-provoking questions
@@ -423,6 +428,17 @@ export async function agentCallRoutes(app: FastifyInstance) {
     };
   });
 
+  // ═══ GET /deepgram-token — Return Deepgram API key for client-side STT/TTS ═
+  app.get('/deepgram-token', {
+    preHandler: [localAuthenticate],
+  }, async (_request: any, reply) => {
+    const key = process.env.DEEPGRAM_API_KEY || '';
+    if (!key) {
+      return reply.status(200).send({ key: '', available: false });
+    }
+    return reply.status(200).send({ key, available: true });
+  });
+
   // ═══ POST /start — Start a call session ════════════════════════════════════
   app.post('/start', {
     preHandler: [localAuthenticate],
@@ -483,13 +499,14 @@ export async function agentCallRoutes(app: FastifyInstance) {
 
     activeSessions.set(sessionId, session);
 
-    // Resolve ElevenLabs key: client → server env → none
+    // Resolve voice engine keys: Deepgram → ElevenLabs → Web Speech
+    const deepgramKey = process.env.DEEPGRAM_API_KEY || '';
     const elevenKey = body.elevenLabsKey || process.env.ELEVENLABS_API_KEY || '';
 
-    // For browser calls, we let the FRONTEND generate TTS directly from the user's browser.
-    // This avoids cloud IP abuse-detection blocks on ElevenLabs free tier.
-    // We pass the voiceId + key so the client can call the ElevenLabs API itself.
-    logger.info(`Browser call started: agent=${agent.id}, elevenLabsKey=${elevenKey ? 'available' : 'none'}, voiceId=${agent.voiceId}`);
+    // Voice engine priority: Deepgram (best) → ElevenLabs → Web Speech fallback
+    const voiceEngine = deepgramKey ? 'deepgram' : (elevenKey ? 'elevenlabs_client' : 'web_speech');
+
+    logger.info(`Browser call started: agent=${agent.id}, voiceEngine=${voiceEngine}, deepgram=${deepgramKey ? 'available' : 'none'}, elevenLabs=${elevenKey ? 'available' : 'none'}`);
 
     return reply.status(201).send({
       sessionId,
@@ -502,10 +519,13 @@ export async function agentCallRoutes(app: FastifyInstance) {
         color2: agent.color2,
         voiceId: agent.voiceId,
         voiceName: agent.voiceName,
+        deepgramVoice: agent.deepgramVoice,
       },
       greeting: agent.greeting,
       elevenLabsKey: elevenKey,
-      voiceEngine: elevenKey ? 'elevenlabs_client' : 'web_speech',
+      deepgramKey,
+      deepgramVoice: agent.deepgramVoice,
+      voiceEngine,
     });
   });
 
@@ -615,6 +635,7 @@ export async function agentCallRoutes(app: FastifyInstance) {
     return {
       text: responseText,
       voiceId,
+      deepgramVoice: agent.deepgramVoice,
       transcript: session.transcript,
       supervisorAlert: getLatestSupervisorAlert(session),
       autoEscalated,

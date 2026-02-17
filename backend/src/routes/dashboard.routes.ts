@@ -945,13 +945,12 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
         <!-- Provider Row -->
         <div class="chat-settings">
           <select id="chatProvider" onchange="onProviderChange()">
-            <option value="" disabled selected>Select provider...</option>
+            <option value="groq" selected>Groq (Fast &mdash; recommended)</option>
             <option value="local">&#9889; Local LLM (In-Browser)</option>
             <optgroup label="Cloud Providers">
               <option value="openai">OpenAI</option>
               <option value="anthropic">Anthropic</option>
               <option value="google">Google Gemini</option>
-              <option value="groq">Groq</option>
               <option value="mistral">Mistral AI</option>
               <option value="deepseek">DeepSeek</option>
               <option value="openrouter">OpenRouter</option>
@@ -1311,12 +1310,12 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
             <div class="form-group" style="flex:1;min-width:150px;">
               <label>LLM Provider</label>
               <select class="form-input" id="voiceTransProvider" onchange="onTransProviderChange()">
+                <option value="groq" selected>Groq (Fast &mdash; recommended)</option>
                 <option value="local_llm">Local LLM (WebLLM — Offline)</option>
                 <option value="kaggle">Kaggle / Ollama (Free GPU)</option>
                 <option value="openai">OpenAI</option>
                 <option value="anthropic">Anthropic</option>
                 <option value="google">Google Gemini</option>
-                <option value="groq">Groq</option>
                 <option value="mistral">Mistral AI</option>
                 <option value="deepseek">DeepSeek</option>
               </select>
@@ -6032,13 +6031,15 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
   var agentCallStart = 0;
   var agentCallMuted = false;
   var agentCallSpeaker = true;
-  var agentCallRecognition = null;    // Web Speech API instance
+  var agentCallRecognition = null;    // Web Speech API instance (fallback)
   var agentCallListening = false;
   var agentCallProcessing = false;    // waiting for LLM + TTS
   var agentCallAudio = null;          // Audio element for TTS playback
   var agentCallAnalyser = null;       // Audio analyser for waveform
   var agentCallMicStream = null;
   var agentCallLang = 'en-US';       // Dynamic STT language (updates on detection)
+  var deepgramSocket = null;          // Deepgram WebSocket for STT
+  var deepgramMediaRecorder = null;   // MediaRecorder for Deepgram STT
   var agentAdminPollTimer = null;
 
   function loadAgentPage() {
@@ -6192,6 +6193,9 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
         voiceId: d.agent.voiceId || '',
         voiceName: d.agent.voiceName || '',
         elevenLabsKey: d.elevenLabsKey || '',
+        deepgramKey: d.deepgramKey || '',
+        deepgramVoice: d.deepgramVoice || d.agent.deepgramVoice || '',
+        voiceEngine: d.voiceEngine || 'web_speech',
       };
 
       // Show call overlay
@@ -6251,13 +6255,135 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     transcript.scrollTop = transcript.scrollHeight;
   }
 
-  // ── Web Speech API Listening ──
+  // ── STT Listening (Deepgram primary, Web Speech API fallback) ──
+
   function startAgentListening() {
+    if (!agentCallSession || agentCallProcessing || agentCallMuted) return;
+
+    // Use Deepgram if key is available
+    if (agentCallSession.deepgramKey) {
+      startDeepgramListening();
+    } else {
+      startWebSpeechListening();
+    }
+  }
+
+  function startDeepgramListening() {
+    if (!agentCallSession || !agentCallSession.deepgramKey) return;
+
+    agentCallListening = true;
+    document.getElementById('callStatus').textContent = 'Listening...';
+    document.getElementById('callAgentAvatar').classList.remove('speaking');
+    animateWaveform(true);
+
+    var finalTranscript = '';
+    var interimDiv = null;
+    var silenceTimer = null;
+
+    function cleanupInterim() {
+      if (interimDiv && interimDiv.parentNode) {
+        interimDiv.parentNode.removeChild(interimDiv);
+        interimDiv = null;
+      }
+    }
+
+    function resetSilenceTimer() {
+      if (silenceTimer) clearTimeout(silenceTimer);
+      silenceTimer = setTimeout(function() {
+        if (finalTranscript.trim() && agentCallListening && !agentCallProcessing) {
+          stopAgentListening();
+          cleanupInterim();
+          sendAgentMessage(finalTranscript.trim());
+          finalTranscript = '';
+        }
+      }, 1500);
+    }
+
+    var dgLang = agentCallLang.split('-')[0] || 'en';
+    var wsUrl = 'wss://api.deepgram.com/v1/listen?model=nova-2&language=' + dgLang + '&smart_format=true&interim_results=true&endpointing=300&vad_events=true';
+
+    try {
+      deepgramSocket = new WebSocket(wsUrl, ['token', agentCallSession.deepgramKey]);
+    } catch(e) {
+      console.error('Deepgram WebSocket error:', e);
+      startWebSpeechListening();
+      return;
+    }
+
+    deepgramSocket.onopen = function() {
+      console.log('Deepgram STT connected');
+      navigator.mediaDevices.getUserMedia({ audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true } }).then(function(stream) {
+        agentCallMicStream = stream;
+        deepgramMediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
+        deepgramMediaRecorder.ondataavailable = function(event) {
+          if (event.data.size > 0 && deepgramSocket && deepgramSocket.readyState === WebSocket.OPEN) {
+            deepgramSocket.send(event.data);
+          }
+        };
+        deepgramMediaRecorder.start(250);
+      }).catch(function(err) {
+        console.error('Mic access error:', err);
+        stopAgentListening();
+        startWebSpeechListening();
+      });
+    };
+
+    deepgramSocket.onmessage = function(event) {
+      try {
+        var data = JSON.parse(event.data);
+        if (data.type === 'Results' && data.channel && data.channel.alternatives && data.channel.alternatives.length > 0) {
+          var transcript = data.channel.alternatives[0].transcript || '';
+          if (!transcript) return;
+
+          if (data.is_final) {
+            finalTranscript += (finalTranscript ? ' ' : '') + transcript;
+            cleanupInterim();
+            resetSilenceTimer();
+          } else {
+            if (!interimDiv) {
+              interimDiv = document.createElement('div');
+              interimDiv.className = 'call-msg user';
+              interimDiv.innerHTML = '<div><div class="call-bubble" style="opacity:0.6;">' + esc(transcript) + '</div></div>';
+              document.getElementById('callTranscript').appendChild(interimDiv);
+              document.getElementById('callTranscript').scrollTop = document.getElementById('callTranscript').scrollHeight;
+            } else {
+              interimDiv.querySelector('.call-bubble').textContent = (finalTranscript ? finalTranscript + ' ' : '') + transcript;
+            }
+            resetSilenceTimer();
+          }
+        }
+      } catch(e) { /* ignore parse errors */ }
+    };
+
+    deepgramSocket.onerror = function(err) {
+      console.error('Deepgram STT error:', err);
+      agentCallListening = false;
+      animateWaveform(false);
+      cleanupInterim();
+      startWebSpeechListening();
+    };
+
+    deepgramSocket.onclose = function() {
+      if (silenceTimer) clearTimeout(silenceTimer);
+      if (agentCallListening && !agentCallProcessing) {
+        agentCallListening = false;
+        animateWaveform(false);
+        cleanupInterim();
+        if (finalTranscript.trim()) {
+          sendAgentMessage(finalTranscript.trim());
+        } else if (agentCallSession && agentCallSession.id) {
+          setTimeout(startAgentListening, 500);
+        }
+      }
+    };
+  }
+
+  function startWebSpeechListening() {
     if (!agentCallSession || agentCallProcessing || agentCallMuted) return;
 
     var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      document.getElementById('callStatus').textContent = 'Speech not supported — type below';
+      document.getElementById('callStatus').textContent = 'Speech not supported in this browser';
       return;
     }
 
@@ -6285,7 +6411,6 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
         }
       }
 
-      // Show interim results
       if (interim && !interimDiv) {
         interimDiv = document.createElement('div');
         interimDiv.className = 'call-msg user';
@@ -6301,7 +6426,6 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
       agentCallListening = false;
       animateWaveform(false);
 
-      // Remove interim div
       if (interimDiv && interimDiv.parentNode) {
         interimDiv.parentNode.removeChild(interimDiv);
         interimDiv = null;
@@ -6310,7 +6434,6 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
       if (finalTranscript.trim()) {
         sendAgentMessage(finalTranscript.trim());
       } else if (agentCallSession && agentCallSession.id && !agentCallProcessing) {
-        // No speech detected — restart listening
         setTimeout(startAgentListening, 500);
       }
     };
@@ -6323,7 +6446,6 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
         interimDiv = null;
       }
       if (event.error === 'no-speech' || event.error === 'aborted') {
-        // Restart listening
         if (agentCallSession && !agentCallProcessing) {
           setTimeout(startAgentListening, 500);
         }
@@ -6332,9 +6454,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
 
     try {
       agentCallRecognition.start();
-    } catch(e) {
-      // Already started
-    }
+    } catch(e) {}
   }
 
   function stopAgentListening() {
@@ -6342,6 +6462,18 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     if (agentCallRecognition) {
       try { agentCallRecognition.abort(); } catch(e) {}
       agentCallRecognition = null;
+    }
+    if (deepgramSocket) {
+      try { deepgramSocket.close(); } catch(e) {}
+      deepgramSocket = null;
+    }
+    if (deepgramMediaRecorder) {
+      try { deepgramMediaRecorder.stop(); } catch(e) {}
+      deepgramMediaRecorder = null;
+    }
+    if (agentCallMicStream) {
+      agentCallMicStream.getTracks().forEach(function(t) { t.stop(); });
+      agentCallMicStream = null;
     }
     animateWaveform(false);
   }
@@ -6426,6 +6558,52 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
   }
 
   // ── Client-side ElevenLabs TTS (runs from user's browser, avoids cloud IP blocks) ──
+  // ── Deepgram Aura TTS ──
+  function generateDeepgramTTS(text, deepgramVoice, deepgramKey, callback) {
+    var bt = String.fromCharCode(96);
+    var codeBlockRe = new RegExp(bt+bt+bt+'[\\\\s\\\\S]*?'+bt+bt+bt, 'g');
+    var ttsText = text
+      .replace(codeBlockRe, ' (code omitted) ')
+      .replace(/[*_~#>]/g, '')
+      .replace(/\\n+/g, '. ')
+      .replace(/  +/g, ' ')
+      .trim();
+    if (ttsText.length > 2000) ttsText = ttsText.substring(0, 1997) + '...';
+    if (!ttsText) { if (callback) callback(false); return; }
+
+    fetch('https://api.deepgram.com/v1/speak?model=' + encodeURIComponent(deepgramVoice) + '&encoding=mp3', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Token ' + deepgramKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ text: ttsText }),
+    })
+    .then(function(resp) {
+      if (!resp.ok) throw new Error('Deepgram TTS failed: ' + resp.status);
+      return resp.blob();
+    })
+    .then(function(blob) {
+      var audioUrl = URL.createObjectURL(blob);
+      agentCallAudio = new Audio(audioUrl);
+      agentCallAudio.volume = agentCallSpeaker ? 1.0 : 0.0;
+      agentCallAudio.onended = function() {
+        URL.revokeObjectURL(audioUrl);
+        if (callback) callback(true);
+      };
+      agentCallAudio.play().catch(function() { if (callback) callback(false); });
+    })
+    .catch(function(err) {
+      console.warn('Deepgram TTS failed, falling back:', err.message);
+      if (agentCallSession && agentCallSession.elevenLabsKey && agentCallSession.voiceId) {
+        generateClientTTS(text, agentCallSession.voiceId, agentCallSession.elevenLabsKey, callback);
+      } else {
+        speakWithWebSpeech(text, function() { if (callback) callback(false); });
+      }
+    });
+  }
+
+  // ── ElevenLabs TTS (fallback) ──
   function generateClientTTS(text, voiceId, apiKey, callback) {
     var bt = String.fromCharCode(96);
     var codeBlockRe = new RegExp(bt+bt+bt+'[\\\\s\\\\S]*?'+bt+bt+bt, 'g');
@@ -6472,7 +6650,9 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
   }
 
   function speakAgentResponse(text, callback) {
-    if (agentCallSession && agentCallSession.elevenLabsKey && agentCallSession.voiceId) {
+    if (agentCallSession && agentCallSession.deepgramKey && agentCallSession.deepgramVoice) {
+      generateDeepgramTTS(text, agentCallSession.deepgramVoice, agentCallSession.deepgramKey, callback);
+    } else if (agentCallSession && agentCallSession.elevenLabsKey && agentCallSession.voiceId) {
       generateClientTTS(text, agentCallSession.voiceId, agentCallSession.elevenLabsKey, callback);
     } else {
       speakWithWebSpeech(text, callback);

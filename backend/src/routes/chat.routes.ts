@@ -21,6 +21,8 @@ import {
 } from '../db/index.js';
 import { localAuthenticate } from '../middleware/rbac.middleware.js';
 import { hasFeatureUnlock } from '../services/levels.service.js';
+import { ControlPanelService } from '../services/controlPanel.service.js';
+import { logger } from '../utils/logger.js';
 import { encryptMessage, decryptMessage } from '../utils/encryption.js';
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
@@ -609,12 +611,34 @@ export async function chatRoutes(app: FastifyInstance) {
     };
   });
 
-  // ═══ POST /ai/tone-check — AI tone analysis ════════════════════════════
+  // ═══ POST /ai/tone-check — AI tone analysis (Groq LLM primary, rule-based fallback) ═
   app.post('/ai/tone-check', {
     preHandler: [localAuthenticate],
   }, async (request: any) => {
     const { text } = request.body as any;
-    if (!text) return { tone: 'neutral', suggestion: '' };
+    if (!text) return { flag: 'neutral', suggestion: '' };
+
+    // Try Groq LLM-powered tone analysis first
+    const groqKey = process.env.GROQ_API_KEY || process.env.DEFAULT_LLM_KEY || '';
+    if (groqKey) {
+      try {
+        const resp = await ControlPanelService.chat({
+          provider: { provider: 'groq', apiKey: groqKey, model: 'llama-3.1-8b-instant' },
+          messages: [
+            { role: 'system', content: 'You are a tone analysis AI. Analyze the emotional tone of the user message. Return ONLY a JSON object with exactly these fields: {"flag":"<tone>","suggestion":"<brief suggestion>"} where tone is one of: neutral, happy, sad, angry, frustrated, sarcastic, anxious. The suggestion should be a brief, helpful tip if the tone might cause issues in a chat (e.g. "Consider softening your language"). If the tone is fine, suggestion can be empty. Return ONLY valid JSON, no other text.' },
+            { role: 'user', content: text },
+          ],
+          maxTokens: 100,
+          temperature: 0.3,
+        });
+        const parsed = JSON.parse(resp.content.trim());
+        if (parsed.flag) return parsed;
+      } catch (e: any) {
+        logger.warn('LLM tone-check failed, falling back to rule-based:', e.message || e);
+      }
+    }
+
+    // Fallback to rule-based detection
     const result = detectTone(text);
     return result;
   });
