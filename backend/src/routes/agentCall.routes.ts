@@ -350,8 +350,10 @@ function detectLanguageFromText(text: string): string | null {
   if (/\b(bonjour|merci|comment|oui|s'il vous plaît|je suis|au revoir)\b/i.test(text)) return 'french';
   // Common German keywords
   if (/\b(hallo|danke|wie geht|bitte|guten|ich bin|ja|nein)\b/i.test(text)) return 'german';
-  // Common Hindi in Roman script
-  if (/\b(namaste|kaise|hai|hain|kya|mujhe|aap|theek|accha|dhanyavaad|bahut|nahi)\b/i.test(text)) return 'hindi';
+  // Common Hindi in Roman script — require 2+ distinct Hindi words to avoid false positives
+  const hindiRomanWords = ['namaste','kaise','hain','mujhe','theek','accha','dhanyavaad','bahut','kripya','aapka','kaisa','kaisi','suniye','bataiye','samajh'];
+  const hindiMatches = hindiRomanWords.filter(function(w) { return new RegExp('\\b' + w + '\\b', 'i').test(lower); });
+  if (hindiMatches.length >= 2) return 'hindi';
   return null;
 }
 
@@ -554,10 +556,20 @@ export async function agentCallRoutes(app: FastifyInstance) {
     // Add user message to transcript
     session.transcript.push({ role: 'user', text: body.text, timestamp: now });
 
-    // Detect language from user's text
+    // Detect language from user's text (only switch if using non-Latin script detection)
     const detLang = detectLanguageFromText(body.text);
-    if (detLang) {
-      session.detectedLanguage = LANG_TO_TWILIO_LOCALE[detLang] || 'en-US';
+    if (detLang && detLang !== 'english') {
+      // For browser calls, only switch language if we detect a non-Latin script
+      // (Devanagari, Arabic, CJK, etc.) to avoid false positives from Roman-script keyword matching
+      const nonLatinScripts = ['hindi', 'arabic', 'chinese', 'japanese', 'korean', 'bengali', 'tamil', 'telugu', 'gujarati', 'russian', 'thai'];
+      const isScriptBased = /[\u0900-\u097F\u0600-\u06FF\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af\u0980-\u09FF\u0B80-\u0BFF\u0C00-\u0C7F\u0A80-\u0AFF\u0400-\u04FF\u0E00-\u0E7F]/.test(body.text);
+      if (session.source === 'browser' && !isScriptBased) {
+        // Browser call with Latin text — keep current language, don't switch on keyword-only detection
+        logger.info(`Language hint: ${detLang} (keyword-only, not switching for browser call)`);
+      } else {
+        session.detectedLanguage = LANG_TO_TWILIO_LOCALE[detLang] || 'en-US';
+        logger.info(`Language switched to: ${detLang} → ${session.detectedLanguage}`);
+      }
     }
 
     // Build LLM messages

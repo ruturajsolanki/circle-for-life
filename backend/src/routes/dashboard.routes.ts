@@ -6490,10 +6490,10 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     try {
       var d = await api('POST', '/v1/agent-calls/' + agentCallSession.id + '/message', { text: text });
 
-      // Update STT language if server detected a different language
-      if (d.detectedLanguage && d.detectedLanguage !== agentCallLang) {
+      // Update STT language only if server explicitly changed it (non-Latin script detected)
+      if (d.detectedLanguage && d.detectedLanguage !== 'en-US' && d.detectedLanguage !== agentCallLang) {
+        console.log('STT language switched to:', d.detectedLanguage, '(from', agentCallLang + ')');
         agentCallLang = d.detectedLanguage;
-        console.log('STT language switched to:', agentCallLang);
       }
 
       appendCallMessage('agent', d.text);
@@ -6502,11 +6502,10 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
       if (d.autoEscalated) {
         appendCallMessage('system', d.autoEscalationMessage || 'A real person has been contacted to help you. They will reach out shortly.');
         setCallStatus('Connecting to human...', 'thinking');
-        var escalationText = d.autoEscalationMessage || 'I have connected you with a real person. They are being notified now.';
         speakAgentResponse(d.text, function() {
           agentCallProcessing = false;
-          setCallStatus('Escalated', 'default');
-          speakWithWebSpeech(escalationText, function() {});
+          setCallStatus('Escalated — still connected', 'default');
+          startAgentListening();
         });
         return;
       }
@@ -6798,21 +6797,30 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     if (!agentCallSession) return;
     try {
       setCallStatus('Escalating to human...', 'thinking');
+      stopAgentListening();
       var d = await api('POST', '/v1/agent-calls/' + agentCallSession.id + '/escalate');
       appendCallMessage('system', d.message);
       if (d.method === 'twilio_call_placed') {
         toast('Phone call placed to admin! They will receive a call shortly.', 'ok');
         setCallStatus('Admin notified via phone', 'default');
       } else if (d.method === 'twilio_failed_notification_sent') {
-        toast('Phone call failed — admin has been notified via the system. Make sure your phone number is verified in Twilio.', 'err');
-        setCallStatus('Escalated (phone failed)', 'default');
+        toast('Admin notified in the system. Phone call could not be placed.', 'err');
+        setCallStatus('Escalated', 'default');
       } else {
         toast(d.message, 'ok');
         setCallStatus('Escalated', 'default');
       }
+      // Speak an escalation confirmation and then keep the call alive for the user
+      speakAgentResponse('Your request has been escalated. An admin has been notified. You can continue talking to me or end the call.', function() {
+        agentCallProcessing = false;
+        setCallStatus('Escalated — still connected', 'default');
+        startAgentListening();
+      });
     } catch(e) {
       toast('Escalation failed: ' + e.message, 'err');
       setCallStatus('Escalation failed', 'default');
+      agentCallProcessing = false;
+      startAgentListening();
     }
   }
 
