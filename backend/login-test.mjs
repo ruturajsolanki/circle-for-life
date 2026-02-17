@@ -35,8 +35,8 @@ async function main() {
     // 5. Click Sign In
     await page.click('#loginBtn');
 
-    // 6. Wait 5 seconds
-    await page.waitForTimeout(5000);
+    // 6. Wait 3 seconds
+    await page.waitForTimeout(3000);
 
     // 7. Screenshot of result
     await page.screenshot({ path: join(OUT_DIR, 'after-login.png'), fullPage: true });

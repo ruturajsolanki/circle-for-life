@@ -1646,16 +1646,16 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
         .agents-page { max-width:100%; overflow:hidden; box-sizing:border-box; }
         .agent-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-bottom:20px; }
         .agent-card { border-radius:14px; padding:16px; position:relative; overflow:hidden; transition:transform 0.25s ease, box-shadow 0.25s ease; border:1px solid var(--border); display:flex; flex-direction:column; gap:8px; cursor:pointer; }
-        .agent-card::before { content:''; position:absolute; top:0; left:0; right:0; bottom:0; background:linear-gradient(180deg,rgba(255,255,255,0.06) 0%,rgba(255,255,255,0) 100%); pointer-events:none; border-radius:14px; }
-        .agent-card:hover { transform:translateY(-3px); box-shadow:0 16px 40px rgba(0,0,0,0.4); }
-        .agent-card .agent-avatar { width:42px; height:42px; border-radius:12px; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:20px; background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.15); margin-bottom:2px; }
-        .agent-card h3 { color:#fff; font-size:15px; font-weight:700; margin:0; line-height:1.2; }
-        .agent-card .agent-specialty { color:rgba(255,255,255,0.6); font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; margin-top:1px; }
-        .agent-card .agent-desc { color:rgba(255,255,255,0.5); font-size:11px; line-height:1.45; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; flex:1; }
+        .agent-card::before { content:''; position:absolute; top:0; left:0; right:0; bottom:0; background:linear-gradient(180deg,rgba(var(--accent-rgb),0.04) 0%,transparent 100%); pointer-events:none; border-radius:14px; }
+        .agent-card:hover { transform:translateY(-3px); box-shadow:0 16px 40px rgba(0,0,0,0.12); }
+        .agent-card .agent-avatar { width:42px; height:42px; border-radius:12px; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:20px; background:var(--bg); border:1px solid var(--border); margin-bottom:2px; }
+        .agent-card h3 { color:var(--text); font-size:15px; font-weight:700; margin:0; line-height:1.2; }
+        .agent-card .agent-specialty { color:var(--text3); font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; margin-top:1px; }
+        .agent-card .agent-desc { color:var(--text2); font-size:11px; line-height:1.45; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; flex:1; }
         .agent-card-footer { display:flex; align-items:center; justify-content:space-between; gap:6px; margin-top:auto; }
-        .agent-card .agent-voice { color:rgba(255,255,255,0.3); font-size:9px; }
-        .agent-call-btn { background:rgba(255,255,255,0.15); backdrop-filter:blur(8px); border:1px solid rgba(255,255,255,0.25); color:#fff; padding:6px 14px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; transition:all 0.2s; display:inline-flex; align-items:center; gap:5px; white-space:nowrap; }
-        .agent-call-btn:hover { background:rgba(255,255,255,0.25); transform:scale(1.03); }
+        .agent-card .agent-voice { color:var(--text3); font-size:9px; }
+        .agent-call-btn { background:var(--accent); border:none; color:#fff; padding:6px 14px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; transition:all 0.2s; display:inline-flex; align-items:center; gap:5px; white-space:nowrap; }
+        .agent-call-btn:hover { opacity:0.9; transform:scale(1.03); }
         .agent-call-btn svg { width:14px; height:14px; }
         .agent-settings-toggle { background:var(--surface); border:1px solid var(--border); color:var(--text2); padding:7px 14px; border-radius:8px; font-size:12px; font-weight:500; cursor:pointer; display:inline-flex; align-items:center; gap:5px; transition:all 0.15s; }
         .agent-settings-toggle:hover { border-color:var(--accent); color:var(--text); }
@@ -1680,38 +1680,48 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
         .admin-call-row { display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; border:1px solid var(--border); margin-bottom:5px; }
         .admin-call-row .live-dot { width:8px; height:8px; border-radius:50%; background:#22c55e; animation:livePulse 1.5s infinite; flex-shrink:0; }
         @keyframes livePulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
-        #agentCallOverlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; z-index:9500; background:linear-gradient(180deg,#0f0f23 0%,#1a1a3e 50%,#0f0f23 100%); flex-direction:column; }
-        .call-header { text-align:center; padding:28px 20px 12px; }
-        .call-avatar-ring { width:88px; height:88px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:38px; margin:0 auto 14px; border:3px solid rgba(255,255,255,0.15); position:relative; }
-        .call-avatar-ring.speaking { animation:callSpeakPulse 1.2s ease-in-out infinite; }
-        @keyframes callSpeakPulse { 0%,100% { box-shadow:0 0 0 0 rgba(var(--accent-rgb),0.4); } 50% { box-shadow:0 0 0 18px rgba(var(--accent-rgb),0); } }
-        .call-agent-name { color:#fff; font-size:20px; font-weight:700; margin-bottom:2px; }
-        .call-agent-specialty { color:rgba(255,255,255,0.45); font-size:12px; margin-bottom:4px; }
-        .call-status { color:var(--accent); font-size:13px; font-weight:600; }
-        .call-timer { color:rgba(255,255,255,0.5); font-size:26px; font-weight:600; font-variant-numeric:tabular-nums; letter-spacing:1px; }
-        .call-transcript { flex:1; overflow-y:auto; padding:10px 20px; scroll-behavior:smooth; }
+        #agentCallOverlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; z-index:9500; background:linear-gradient(160deg,#0c0c1d 0%,#141432 40%,#1a1040 70%,#0c0c1d 100%); flex-direction:column; overflow:hidden; }
+        #agentCallOverlay::before { content:''; position:absolute; top:-50%; left:-50%; width:200%; height:200%; background:radial-gradient(circle at 50% 50%, rgba(var(--accent-rgb),0.06) 0%, transparent 50%); pointer-events:none; animation:callAmbient 8s ease-in-out infinite; }
+        @keyframes callAmbient { 0%,100% { transform:translate(0,0) scale(1); } 50% { transform:translate(2%,-2%) scale(1.05); } }
+        .call-header { text-align:center; padding:32px 20px 16px; position:relative; z-index:1; }
+        .call-avatar-ring { width:96px; height:96px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:42px; margin:0 auto 16px; border:3px solid rgba(255,255,255,0.12); position:relative; background:rgba(255,255,255,0.04); backdrop-filter:blur(12px); transition:all 0.4s ease; }
+        .call-avatar-ring.speaking { border-color:rgba(var(--accent-rgb),0.5); animation:callSpeakPulse 1.5s ease-in-out infinite; }
+        .call-avatar-ring.listening { border-color:rgba(34,197,94,0.5); box-shadow:0 0 0 6px rgba(34,197,94,0.1); }
+        @keyframes callSpeakPulse { 0%,100% { box-shadow:0 0 0 0 rgba(var(--accent-rgb),0.35); } 50% { box-shadow:0 0 0 20px rgba(var(--accent-rgb),0); } }
+        .call-agent-name { color:#fff; font-size:22px; font-weight:800; margin-bottom:4px; letter-spacing:-0.3px; }
+        .call-agent-specialty { color:rgba(255,255,255,0.4); font-size:12px; font-weight:500; margin-bottom:6px; text-transform:uppercase; letter-spacing:1px; }
+        .call-status { font-size:13px; font-weight:600; padding:4px 12px; border-radius:20px; display:inline-block; transition:all 0.3s; }
+        .call-status.status-listening { color:#22c55e; background:rgba(34,197,94,0.1); border:1px solid rgba(34,197,94,0.2); }
+        .call-status.status-speaking { color:var(--accent); background:rgba(var(--accent-rgb),0.1); border:1px solid rgba(var(--accent-rgb),0.2); }
+        .call-status.status-thinking { color:#f59e0b; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.2); }
+        .call-status.status-default { color:rgba(255,255,255,0.5); background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); }
+        .call-timer { color:rgba(255,255,255,0.45); font-size:14px; font-weight:600; font-variant-numeric:tabular-nums; letter-spacing:0.5px; margin-top:8px; }
+        .call-transcript { flex:1; overflow-y:auto; padding:12px 24px; scroll-behavior:smooth; position:relative; z-index:1; mask-image:linear-gradient(to bottom,transparent 0px,black 20px,black calc(100% - 20px),transparent 100%); -webkit-mask-image:linear-gradient(to bottom,transparent 0px,black 20px,black calc(100% - 20px),transparent 100%); }
         .call-transcript::-webkit-scrollbar { width:3px; }
-        .call-transcript::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.08); border-radius:2px; }
-        .call-msg { display:flex; margin-bottom:8px; animation:msgIn 0.2s ease; }
-        @keyframes msgIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+        .call-transcript::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.06); border-radius:3px; }
+        .call-msg { display:flex; margin-bottom:10px; animation:msgIn 0.25s ease; }
+        @keyframes msgIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
         .call-msg.user { justify-content:flex-end; }
         .call-msg.agent { justify-content:flex-start; }
-        .call-msg .call-bubble { max-width:80%; padding:9px 13px; border-radius:12px; font-size:13px; line-height:1.5; }
-        .call-msg.user .call-bubble { background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; border-bottom-right-radius:3px; }
-        .call-msg.agent .call-bubble { background:rgba(255,255,255,0.07); color:rgba(255,255,255,0.9); border-bottom-left-radius:3px; }
-        .call-msg.system .call-bubble { background:rgba(239,68,68,0.12); color:rgba(255,255,255,0.65); border-radius:8px; font-size:11px; text-align:center; max-width:100%; }
-        .call-msg .call-time { font-size:9px; color:rgba(255,255,255,0.25); margin-top:3px; }
-        .call-waveform { display:flex; align-items:center; justify-content:center; gap:2px; height:28px; padding:6px 20px; }
-        .call-waveform .wbar { width:3px; border-radius:2px; background:var(--accent); transition:height 0.05s; height:4px; }
-        .call-controls { display:flex; align-items:center; justify-content:center; gap:16px; padding:16px 20px; padding-bottom:max(16px,env(safe-area-inset-bottom)); }
-        .call-ctrl-btn { width:52px; height:52px; border-radius:50%; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s; color:#fff; }
-        .call-ctrl-btn.mute { background:rgba(255,255,255,0.1); }
-        .call-ctrl-btn.mute.active { background:#ef4444; }
-        .call-ctrl-btn.speaker { background:rgba(255,255,255,0.1); }
-        .call-ctrl-btn.escalate { background:rgba(245,158,11,0.25); border:1px solid rgba(245,158,11,0.4); }
-        .call-ctrl-btn.escalate:hover { background:rgba(245,158,11,0.45); }
-        .call-ctrl-btn.end-call { background:#ef4444; width:60px; height:60px; }
-        .call-ctrl-btn.end-call:hover { background:#dc2626; transform:scale(1.06); }
+        .call-msg .call-bubble { max-width:80%; padding:10px 14px; border-radius:16px; font-size:13px; line-height:1.55; }
+        .call-msg.user .call-bubble { background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; border-bottom-right-radius:4px; box-shadow:0 2px 8px rgba(var(--accent-rgb),0.2); }
+        .call-msg.agent .call-bubble { background:rgba(255,255,255,0.06); color:rgba(255,255,255,0.88); border-bottom-left-radius:4px; border:1px solid rgba(255,255,255,0.06); backdrop-filter:blur(8px); }
+        .call-msg.system .call-bubble { background:rgba(239,68,68,0.1); color:rgba(255,255,255,0.6); border-radius:10px; font-size:11px; text-align:center; max-width:100%; border:1px solid rgba(239,68,68,0.15); }
+        .call-msg .call-time { font-size:9px; color:rgba(255,255,255,0.2); margin-top:4px; }
+        .call-waveform { display:flex; align-items:center; justify-content:center; gap:3px; height:32px; padding:8px 20px; position:relative; z-index:1; }
+        .call-waveform .wbar { width:3px; border-radius:3px; background:var(--accent); transition:height 0.08s ease; height:4px; opacity:0.7; }
+        .call-waveform.active .wbar { opacity:1; }
+        .call-controls { display:flex; align-items:center; justify-content:center; gap:18px; padding:18px 24px; padding-bottom:max(20px,env(safe-area-inset-bottom)); position:relative; z-index:1; background:linear-gradient(to top,rgba(0,0,0,0.3) 0%,transparent 100%); }
+        .call-ctrl-btn { width:52px; height:52px; border-radius:50%; border:1px solid rgba(255,255,255,0.08); cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.25s ease; color:#fff; backdrop-filter:blur(8px); }
+        .call-ctrl-btn:hover { transform:scale(1.08); }
+        .call-ctrl-btn:active { transform:scale(0.95); }
+        .call-ctrl-btn.mute { background:rgba(255,255,255,0.08); }
+        .call-ctrl-btn.mute.active { background:#ef4444; border-color:#ef4444; }
+        .call-ctrl-btn.speaker { background:rgba(255,255,255,0.08); }
+        .call-ctrl-btn.escalate { background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.3); }
+        .call-ctrl-btn.escalate:hover { background:rgba(245,158,11,0.35); }
+        .call-ctrl-btn.end-call { background:#ef4444; border-color:#ef4444; width:62px; height:62px; box-shadow:0 4px 20px rgba(239,68,68,0.3); }
+        .call-ctrl-btn.end-call:hover { background:#dc2626; box-shadow:0 4px 24px rgba(239,68,68,0.5); }
         .call-ctrl-btn svg { width:22px; height:22px; }
       </style>
       <div class="agents-page">
@@ -2016,7 +2026,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     <div class="call-avatar-ring" id="callAgentAvatar">?</div>
     <div class="call-agent-name" id="callAgentName"></div>
     <div class="call-agent-specialty" id="callAgentSpecialty"></div>
-    <div class="call-status" id="callStatus">Connecting...</div>
+    <div class="call-status status-default" id="callStatus">Connecting...</div>
     <div class="call-timer" id="callTimer">0:00</div>
   </div>
   <div class="call-transcript" id="callTranscript"></div>
@@ -2025,6 +2035,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     <div class="wbar"></div><div class="wbar"></div><div class="wbar"></div><div class="wbar"></div><div class="wbar"></div>
     <div class="wbar"></div><div class="wbar"></div><div class="wbar"></div><div class="wbar"></div><div class="wbar"></div>
     <div class="wbar"></div><div class="wbar"></div><div class="wbar"></div><div class="wbar"></div><div class="wbar"></div>
+    <div class="wbar"></div><div class="wbar"></div><div class="wbar"></div><div class="wbar"></div>
   </div>
   <div class="call-controls">
     <button class="call-ctrl-btn mute" id="callMuteBtn" onclick="toggleAgentCallMute()" title="Mute">
@@ -6205,7 +6216,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
       document.getElementById('callAgentAvatar').style.background = 'linear-gradient(135deg,' + d.agent.color1 + ',' + d.agent.color2 + ')';
       document.getElementById('callAgentName').textContent = d.agent.name;
       document.getElementById('callAgentSpecialty').textContent = d.agent.specialty;
-      document.getElementById('callStatus').textContent = 'Connected';
+      setCallStatus('Connected', 'default');
       document.getElementById('callTimer').textContent = '0:00';
 
       // Start timer
@@ -6223,19 +6234,15 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
       // Play greeting: client-side ElevenLabs TTS or Web Speech fallback
       console.log('Agent call TTS config:', { voiceId: agentCallSession.voiceId, hasKey: !!agentCallSession.elevenLabsKey, keyLen: (agentCallSession.elevenLabsKey||'').length, voiceEngine: d.voiceEngine });
       if (agentCallSession.elevenLabsKey && agentCallSession.voiceId) {
-        document.getElementById('callStatus').textContent = 'Speaking (ElevenLabs)...';
-        document.getElementById('callAgentAvatar').classList.add('speaking');
+        setCallStatus('Speaking...', 'speaking');
         generateClientTTS(d.greeting, agentCallSession.voiceId, agentCallSession.elevenLabsKey, function(ok) {
-          document.getElementById('callAgentAvatar').classList.remove('speaking');
-          document.getElementById('callStatus').textContent = 'Listening...';
+          setCallStatus('Listening...', 'listening');
           startAgentListening();
         });
       } else {
-        document.getElementById('callStatus').textContent = 'Speaking...';
-        document.getElementById('callAgentAvatar').classList.add('speaking');
+        setCallStatus('Speaking...', 'speaking');
         speakWithWebSpeech(d.greeting, function() {
-          document.getElementById('callAgentAvatar').classList.remove('speaking');
-          document.getElementById('callStatus').textContent = 'Listening...';
+          setCallStatus('Listening...', 'listening');
           startAgentListening();
         });
       }
@@ -6272,8 +6279,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     if (!agentCallSession || !agentCallSession.deepgramKey) return;
 
     agentCallListening = true;
-    document.getElementById('callStatus').textContent = 'Listening...';
-    document.getElementById('callAgentAvatar').classList.remove('speaking');
+    setCallStatus('Listening...', 'listening');
     animateWaveform(true);
 
     var finalTranscript = '';
@@ -6383,7 +6389,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
 
     var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      document.getElementById('callStatus').textContent = 'Speech not supported in this browser';
+      setCallStatus('Speech not supported', 'default');
       return;
     }
 
@@ -6393,8 +6399,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     agentCallRecognition.lang = agentCallLang;
 
     agentCallListening = true;
-    document.getElementById('callStatus').textContent = 'Listening...';
-    document.getElementById('callAgentAvatar').classList.remove('speaking');
+    setCallStatus('Listening...', 'listening');
     animateWaveform(true);
 
     var finalTranscript = '';
@@ -6486,8 +6491,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     stopAgentListening();
 
     appendCallMessage('user', text);
-    document.getElementById('callStatus').textContent = 'Thinking...';
-    document.getElementById('callAgentAvatar').classList.remove('speaking');
+    setCallStatus('Thinking...', 'thinking');
 
     try {
       var d = await api('POST', '/v1/agent-calls/' + agentCallSession.id + '/message', { text: text });
@@ -6503,11 +6507,11 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
       // Check if auto-escalated by supervisor
       if (d.autoEscalated) {
         appendCallMessage('system', d.autoEscalationMessage || 'A real person has been contacted to help you. They will reach out shortly.');
-        document.getElementById('callStatus').textContent = 'Connecting to human support...';
+        setCallStatus('Connecting to human...', 'thinking');
         var escalationText = d.autoEscalationMessage || 'I have connected you with a real person. They are being notified now.';
         speakAgentResponse(d.text, function() {
           agentCallProcessing = false;
-          document.getElementById('callAgentAvatar').classList.remove('speaking');
+          setCallStatus('Escalated', 'default');
           speakWithWebSpeech(escalationText, function() {});
         });
         return;
@@ -6520,12 +6524,11 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
         }
       }
 
-      // Speak agent response: client-side ElevenLabs TTS or Web Speech fallback
-      document.getElementById('callStatus').textContent = 'Speaking...';
-      document.getElementById('callAgentAvatar').classList.add('speaking');
+      // Speak agent response
+      setCallStatus('Speaking...', 'speaking');
       speakAgentResponse(d.text, function() {
         agentCallProcessing = false;
-        document.getElementById('callAgentAvatar').classList.remove('speaking');
+        setCallStatus('Listening...', 'listening');
         startAgentListening();
       });
 
@@ -6730,20 +6733,33 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
 
   // ── Waveform animation ──
   var waveAnimFrame = null;
+  function setCallStatus(text, mode) {
+    var el = document.getElementById('callStatus');
+    el.textContent = text;
+    el.className = 'call-status status-' + (mode || 'default');
+    var avatar = document.getElementById('callAgentAvatar');
+    avatar.classList.remove('speaking', 'listening');
+    if (mode === 'listening') avatar.classList.add('listening');
+    if (mode === 'speaking') avatar.classList.add('speaking');
+  }
+
   function animateWaveform(active) {
-    var bars = document.querySelectorAll('#callWaveform .wbar');
+    var wf = document.getElementById('callWaveform');
+    var bars = wf.querySelectorAll('.wbar');
     if (!active) {
       if (waveAnimFrame) cancelAnimationFrame(waveAnimFrame);
       waveAnimFrame = null;
+      wf.classList.remove('active');
       bars.forEach(function(b) { b.style.height = '4px'; });
       return;
     }
+    wf.classList.add('active');
     function frame() {
       bars.forEach(function(b) {
-        b.style.height = (4 + Math.random() * 24) + 'px';
+        b.style.height = (4 + Math.random() * 26) + 'px';
       });
       waveAnimFrame = requestAnimationFrame(function() {
-        setTimeout(frame, 80);
+        setTimeout(frame, 70);
       });
     }
     frame();
@@ -6756,7 +6772,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     btn.classList.toggle('active', agentCallMuted);
     if (agentCallMuted) {
       stopAgentListening();
-      document.getElementById('callStatus').textContent = 'Muted';
+      setCallStatus('Muted', 'default');
     } else {
       if (!agentCallProcessing) startAgentListening();
     }
@@ -6772,22 +6788,22 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
   async function escalateAgentCall() {
     if (!agentCallSession) return;
     try {
-      document.getElementById('callStatus').textContent = 'Escalating to human...';
+      setCallStatus('Escalating to human...', 'thinking');
       var d = await api('POST', '/v1/agent-calls/' + agentCallSession.id + '/escalate');
       appendCallMessage('system', d.message);
       if (d.method === 'twilio_call_placed') {
         toast('Phone call placed to admin! They will receive a call shortly.', 'ok');
-        document.getElementById('callStatus').textContent = 'Admin notified via phone';
+        setCallStatus('Admin notified via phone', 'default');
       } else if (d.method === 'twilio_failed_notification_sent') {
         toast('Phone call failed — admin has been notified via the system. Make sure your phone number is verified in Twilio.', 'err');
-        document.getElementById('callStatus').textContent = 'Escalated (phone failed)';
+        setCallStatus('Escalated (phone failed)', 'default');
       } else {
         toast(d.message, 'ok');
-        document.getElementById('callStatus').textContent = 'Escalated';
+        setCallStatus('Escalated', 'default');
       }
     } catch(e) {
       toast('Escalation failed: ' + e.message, 'err');
-      document.getElementById('callStatus').textContent = 'Escalation failed';
+      setCallStatus('Escalation failed', 'default');
     }
   }
 
@@ -6805,7 +6821,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     var agentAvatar = agentCallSession.agentAvatar || '?';
     agentCallProcessing = false;
 
-    document.getElementById('callStatus').textContent = 'Ending call...';
+    setCallStatus('Ending call...', 'default');
 
     // End on server
     var summary = '';
@@ -7189,11 +7205,18 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
   function loadAgentSettings() {
     try {
       var saved = JSON.parse(localStorage.getItem('cfl_agent_settings') || '{}');
-      if (saved.provider) document.getElementById('agentLLMProvider').value = saved.provider;
+      if (saved.provider) {
+        document.getElementById('agentLLMProvider').value = saved.provider;
+        // Validate: if kaggle is saved but no URL, reset to server_default
+        if (saved.provider === 'kaggle' && !saved.kaggleUrl) {
+          document.getElementById('agentLLMProvider').value = 'server_default';
+        }
+      }
       if (saved.apiKey) document.getElementById('agentLLMKey').value = saved.apiKey;
       if (saved.kaggleUrl) document.getElementById('agentKaggleUrl').value = saved.kaggleUrl;
       if (saved.model) document.getElementById('agentLLMModel').value = saved.model;
       if (saved.elevenLabsKey) document.getElementById('agentElevenLabsKey').value = saved.elevenLabsKey;
+      updateAgentModelList();
     } catch(e) {}
   }
 
