@@ -480,9 +480,14 @@ export async function agentCallRoutes(app: FastifyInstance) {
         { role: 'agent', text: agent.greeting, timestamp: now },
       ],
       supervisorNotes: [],
-      providerConfig: (body.provider && body.provider.provider !== 'server_default')
-        ? body.provider as ProviderConfig
-        : getPhoneCallProvider(),
+      providerConfig: (() => {
+        if (!body.provider || body.provider.provider === 'server_default') return getPhoneCallProvider();
+        // If kaggle/ollama is specified but baseUrl looks invalid, fallback to server default
+        if (body.provider.provider === 'kaggle' && body.provider.baseUrl) {
+          try { new URL(body.provider.baseUrl); } catch { return getPhoneCallProvider(); }
+        }
+        return body.provider as ProviderConfig;
+      })(),
       elevenLabsKey: body.elevenLabsKey || process.env.ELEVENLABS_API_KEY || '',
       startedAt: now,
       endedAt: '',
@@ -568,7 +573,7 @@ export async function agentCallRoutes(app: FastifyInstance) {
 
     let responseText = '';
 
-    // Try configured provider first, fall back to simple echo
+    // Try configured provider first, then fallback to server default (Groq), then error
     if (session.providerConfig && session.providerConfig.apiKey) {
       try {
         const resp = await ControlPanelService.chat({
@@ -579,12 +584,49 @@ export async function agentCallRoutes(app: FastifyInstance) {
         });
         responseText = resp.content;
       } catch (e: any) {
-        logger.error('Agent LLM error:', e.error || e.message);
-        responseText = "I'm sorry, I'm having a technical issue right now. Could you repeat that?";
+        logger.error('Agent LLM error (primary):', e.error || e.message);
+        // Fallback: try server-default provider (Groq)
+        const fallback = getPhoneCallProvider();
+        if (fallback && fallback.apiKey && fallback.provider !== session.providerConfig.provider) {
+          try {
+            logger.info(`Agent LLM fallback to ${fallback.provider}/${fallback.model}`);
+            session.providerConfig = fallback;
+            const resp2 = await ControlPanelService.chat({
+              provider: fallback,
+              messages: llmMessages,
+              maxTokens: 256,
+              temperature: 0.7,
+            });
+            responseText = resp2.content;
+          } catch (e2: any) {
+            logger.error('Agent LLM fallback also failed:', e2.error || e2.message);
+            responseText = "I'm sorry, I'm having a technical issue right now. Could you repeat that?";
+          }
+        } else {
+          responseText = "I'm sorry, I'm having a technical issue right now. Could you repeat that?";
+        }
       }
     } else {
-      // No provider configured — return a helpful message
-      responseText = "I'd love to help, but I need an AI provider to be configured. Please set up an API key in the settings to enable my full capabilities.";
+      // No provider configured — try server default
+      const fallback = getPhoneCallProvider();
+      if (fallback && fallback.apiKey) {
+        try {
+          logger.info(`Agent: no provider set, using server default ${fallback.provider}/${fallback.model}`);
+          session.providerConfig = fallback;
+          const resp = await ControlPanelService.chat({
+            provider: fallback,
+            messages: llmMessages,
+            maxTokens: 256,
+            temperature: 0.7,
+          });
+          responseText = resp.content;
+        } catch (e: any) {
+          logger.error('Agent LLM server-default error:', e.error || e.message);
+          responseText = "I'm sorry, I'm having a technical issue right now. Could you repeat that?";
+        }
+      } else {
+        responseText = "I'd love to help, but I need an AI provider to be configured. Please set up an API key in the settings to enable my full capabilities.";
+      }
     }
 
     // Strip action markers like *gentle tone*, *smiles*, etc. that LLMs sometimes add
