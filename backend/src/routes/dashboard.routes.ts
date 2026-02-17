@@ -29,7 +29,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     :root {
       --bg: #FFFFFF; --bg2: #F9FAFB; --surface: #FFFFFF; --surface2: #F3F4F6;
       --border: #E5E7EB; --text: #111827; --text2: #6B7280; --text3: #9CA3AF;
-      --accent: #6366F1; --accent2: #4F46E5; --accent-glow: rgba(99,102,241,0.10);
+      --accent: #2563EB; --accent2: #1D4ED8; --accent-rgb: 37,99,235; --accent-glow: rgba(37,99,235,0.10);
       --green: #16A34A; --red: #DC2626; --orange: #D97706; --purple: #7C3AED;
       --pink: #DB2777; --radius: 12px; --radius-lg: 16px;
       --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
@@ -42,7 +42,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     [data-theme="dark"] {
       --bg: #09090B; --bg2: #0D0D0F; --surface: #18181B; --surface2: #27272A;
       --border: #3F3F46; --text: #FAFAFA; --text2: #A1A1AA; --text3: #71717A;
-      --accent-glow: rgba(99,102,241,0.12);
+      --accent: #6366F1; --accent2: #4F46E5; --accent-rgb: 99,102,241; --accent-glow: rgba(var(--accent-rgb),0.12);
       --green: #22C55E; --red: #EF4444; --orange: #F59E0B; --purple: #A855F7;
       --pink: #EC4899;
       --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
@@ -70,7 +70,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
 
     /* ── Auth Pages ── */
     .auth-page { display: flex; min-height: 100vh; align-items: center; justify-content: center; padding: 20px;
-      background: radial-gradient(ellipse at 50% 0%, rgba(99,102,241,0.08) 0%, transparent 60%);
+      background: radial-gradient(ellipse at 50% 0%, rgba(var(--accent-rgb),0.08) 0%, transparent 60%);
     }
     .auth-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 40px; width: 100%; max-width: 420px; box-shadow: var(--shadow-lg); }
     .auth-logo { text-align: center; margin-bottom: 32px; }
@@ -87,7 +87,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     .form-error { color: var(--red); font-size: 12px; margin-top: 4px; display: none; }
     .form-error.show { display: block; }
     .btn-primary { width: 100%; background: var(--accent); color: #fff; padding: 12px; border-radius: var(--radius); font-size: 15px; font-weight: 700; }
-    .btn-primary:hover { background: var(--accent2); box-shadow: 0 4px 16px rgba(99,102,241,0.3); transform: translateY(-1px); }
+    .btn-primary:hover { background: var(--accent2); box-shadow: 0 4px 16px rgba(var(--accent-rgb),0.3); transform: translateY(-1px); }
     .btn-primary:active { transform: translateY(0); box-shadow: none; }
     .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
     .auth-switch { text-align: center; margin-top: 20px; font-size: 14px; color: var(--text2); }
@@ -124,8 +124,9 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     .user-pill-role { font-size: 11px; color: var(--text3); }
     .logout-btn { background: none; color: var(--text3); font-size: 18px; padding: 6px; line-height: 1; border-radius: 6px; }
     .logout-btn:hover { color: var(--red); background: rgba(239,68,68,0.08); }
-    .theme-toggle { background: none; border: 1px solid var(--border); color: var(--text2); font-size: 16px; padding: 5px 7px; line-height: 1; border-radius: 6px; cursor: pointer; transition: all var(--transition); }
+    .theme-toggle { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; background: var(--surface2); border: 1px solid var(--border); color: var(--text2); font-size: 13px; font-weight: 500; padding: 8px 12px; line-height: 1; border-radius: 8px; cursor: pointer; transition: all var(--transition); margin-bottom: 10px; }
     .theme-toggle:hover { color: var(--accent); background: var(--hover-bg); border-color: var(--accent); }
+    .theme-toggle .theme-icon { font-size: 16px; }
 
     .main { flex: 1; margin-left: 250px; padding: 28px 36px; max-width: calc(100vw - 250px); overflow-x: hidden; box-sizing: border-box; }
     .page-header { margin-bottom: 24px; }
@@ -154,7 +155,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     .toolbar-btn:hover { transform: translateY(-1px); }
     .toolbar-btn:active { transform: translateY(0); }
     .toolbar-btn-primary { background: var(--accent); color: #fff; }
-    .toolbar-btn-primary:hover { box-shadow: 0 2px 10px rgba(99,102,241,0.3); }
+    .toolbar-btn-primary:hover { box-shadow: 0 2px 10px rgba(var(--accent-rgb),0.3); }
     .toolbar-btn-success { background: var(--green); color: #fff; }
     .toolbar-btn-success:hover { box-shadow: 0 2px 10px rgba(34,197,94,0.3); }
     table { width: 100%; border-collapse: collapse; }
@@ -166,7 +167,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     .role-admin { background: rgba(245,158,11,0.12); color: var(--orange); }
     .role-moderator { background: rgba(168,85,247,0.12); color: var(--purple); }
     .role-creator { background: rgba(34,197,94,0.12); color: var(--green); }
-    .role-user { background: rgba(99,102,241,0.12); color: var(--accent); }
+    .role-user { background: rgba(var(--accent-rgb),0.12); color: var(--accent); }
     .role-guest { background: rgba(113,113,122,0.12); color: var(--text3); }
     .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
     .dot-green { background: var(--green); }
@@ -175,7 +176,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     .dot-gray { background: var(--text3); }
     .btn-xs { padding: 5px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; margin-right: 4px; margin-bottom: 4px; display: inline-block; }
     .btn-xs:hover { filter: brightness(1.2); }
-    .btn-xs-blue { background: rgba(99,102,241,0.12); color: var(--accent); }
+    .btn-xs-blue { background: rgba(var(--accent-rgb),0.12); color: var(--accent); }
     .btn-xs-green { background: rgba(34,197,94,0.12); color: var(--green); }
     .btn-xs-red { background: rgba(239,68,68,0.12); color: var(--red); }
     .btn-xs-orange { background: rgba(245,158,11,0.12); color: var(--orange); }
@@ -192,7 +193,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     .modal-footer button:hover { transform: translateY(-1px); }
     .modal-footer button:active { transform: translateY(0); }
     .btn-modal-primary { background: var(--accent); color: #fff; }
-    .btn-modal-primary:hover { box-shadow: 0 2px 10px rgba(99,102,241,0.3); }
+    .btn-modal-primary:hover { box-shadow: 0 2px 10px rgba(var(--accent-rgb),0.3); }
     .btn-modal-cancel { background: var(--surface2); color: var(--text2); }
     .btn-modal-cancel:hover { background: var(--border); color: var(--text); }
     .btn-modal-danger { background: var(--red); color: #fff; }
@@ -224,7 +225,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     .api-row input { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; color: var(--text); font-size: 14px; }
     .api-row input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow); }
     .api-row button { background: var(--accent); color: #fff; border-radius: 8px; padding: 10px 24px; font-weight: 700; }
-    .api-row button:hover { background: var(--accent2); box-shadow: 0 2px 10px rgba(99,102,241,0.3); }
+    .api-row button:hover { background: var(--accent2); box-shadow: 0 2px 10px rgba(var(--accent-rgb),0.3); }
     #apiBody { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px; color: var(--text); font-size: 13px; font-family: 'SF Mono', 'Fira Code', monospace; min-height: 80px; resize: vertical; margin-bottom: 12px; }
     #apiBody:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow); }
     #apiResponse { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; font-size: 13px; white-space: pre-wrap; word-break: break-all; max-height: 400px; overflow-y: auto; font-family: 'SF Mono', 'Fira Code', monospace; color: var(--green); }
@@ -253,7 +254,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     /* ── Conversation Items ── */
     .convo-item { background:transparent; border:1px solid transparent; }
     .convo-item:hover { background:var(--hover-bg); }
-    .convo-item.active { background:var(--accent-glow); border-color:rgba(99,102,241,0.2); }
+    .convo-item.active { background:var(--accent-glow); border-color:rgba(var(--accent-rgb),0.2); }
     .convo-item.active:hover { background:var(--accent-glow); }
 
     /* ── Level System ── */
@@ -269,7 +270,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     .level-bar-fill { height: 100%; border-radius: 6px; transition: width 0.8s ease; }
     .level-perks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
     .level-perk { font-size: 12px; padding: 4px 10px; background: var(--hover-bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text2); }
-    .level-perk.active { background: var(--accent-glow); border-color: rgba(99,102,241,0.3); color: var(--accent); }
+    .level-perk.active { background: var(--accent-glow); border-color: rgba(var(--accent-rgb),0.3); color: var(--accent); }
 
     /* Level Roadmap */
     .levels-roadmap { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-top: 16px; }
@@ -293,7 +294,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     .btn-icon:hover { background:var(--surface2); color:var(--accent); }
 
     /* ── Blueprint Page ───────────────────────────────── */
-    .bp-hero { text-align:center; padding:40px 24px; background:linear-gradient(135deg, rgba(99,102,241,0.08), rgba(168,85,247,0.08)); border:1px solid var(--border); border-radius:16px; margin-bottom:32px; }
+    .bp-hero { text-align:center; padding:40px 24px; background:linear-gradient(135deg, rgba(var(--accent-rgb),0.08), rgba(168,85,247,0.08)); border:1px solid var(--border); border-radius:16px; margin-bottom:32px; }
     .bp-hero-badge { display:inline-block; padding:4px 16px; background:var(--accent); color:#fff; border-radius:999px; font-size:0.7rem; font-weight:700; letter-spacing:2px; margin-bottom:12px; }
     .bp-hero-tagline { font-size:1.6rem; font-weight:800; margin:0 0 12px; background:linear-gradient(135deg,var(--accent),#a855f7); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
     .bp-hero-pitch { max-width:620px; margin:0 auto 20px; color:var(--text2); line-height:1.6; }
@@ -301,14 +302,14 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     .bp-section-title { font-size:1.15rem; font-weight:700; margin:32px 0 16px; padding-bottom:8px; border-bottom:2px solid var(--accent); display:inline-block; }
     .bp-growth-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:16px; margin-bottom:24px; }
     .bp-card { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:20px; transition:all 0.2s; }
-    .bp-card:hover { border-color:var(--accent); transform:translateY(-2px); box-shadow:0 8px 24px rgba(99,102,241,0.1); }
+    .bp-card:hover { border-color:var(--accent); transform:translateY(-2px); box-shadow:0 8px 24px rgba(var(--accent-rgb),0.1); }
     .bp-card-icon { font-size:1.8rem; margin-bottom:8px; }
     .bp-card h4 { margin:0 0 6px; font-weight:700; }
     .bp-card p { margin:0; color:var(--text2); font-size:0.85rem; line-height:1.5; }
     .bp-timeline { display:flex; gap:0; overflow-x:auto; padding-bottom:12px; margin-bottom:24px; }
     .bp-phase { flex:1; min-width:220px; position:relative; padding:20px; border:1px solid var(--border); border-radius:14px; background:var(--surface); margin-right:12px; }
     .bp-phase:last-child { margin-right:0; }
-    .bp-phase.current { border-color:var(--accent); background:linear-gradient(135deg,rgba(99,102,241,0.06),rgba(168,85,247,0.06)); }
+    .bp-phase.current { border-color:var(--accent); background:linear-gradient(135deg,rgba(var(--accent-rgb),0.06),rgba(168,85,247,0.06)); }
     .bp-phase-badge { display:inline-block; padding:2px 10px; border-radius:99px; font-size:0.65rem; font-weight:700; letter-spacing:1px; margin-bottom:8px; }
     .bp-phase.current .bp-phase-badge { background:var(--accent); color:#fff; }
     .bp-phase.planned .bp-phase-badge { background:var(--surface2); color:var(--text2); }
@@ -323,10 +324,10 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     .bp-table tr:last-child td { border-bottom:none; }
     .bp-status-badge { display:inline-block; padding:2px 10px; border-radius:99px; font-size:0.7rem; font-weight:600; }
     .bp-status-built { background:rgba(34,197,94,0.1); color:#22c55e; }
-    .bp-status-planned { background:rgba(99,102,241,0.1); color:var(--accent); }
+    .bp-status-planned { background:rgba(var(--accent-rgb),0.1); color:var(--accent); }
     .bp-status-in_progress { background:rgba(245,158,11,0.1); color:#f59e0b; }
     .bp-status-done { background:rgba(34,197,94,0.15); color:#16a34a; }
-    .bp-status-shipped { background:rgba(99,102,241,0.15); color:#6366f1; }
+    .bp-status-shipped { background:rgba(var(--accent-rgb),0.15); color:var(--accent); }
     .bp-milestones { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:12px; margin-bottom:24px; }
     .bp-ms-card { display:flex; align-items:center; gap:12px; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:14px 16px; transition:all 0.2s; }
     .bp-ms-card:hover { border-color:var(--accent); }
@@ -493,6 +494,10 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
 
 <!-- ═══════════════════ AUTH PAGE ═══════════════════ -->
 <div id="authPage" class="auth-page">
+  <button onclick="toggleTheme()" style="position:fixed;top:16px;right:16px;z-index:10;background:var(--surface);border:1px solid var(--border);color:var(--text2);padding:8px 14px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500;display:flex;align-items:center;gap:6px;transition:all 0.2s;box-shadow:var(--shadow-sm);" title="Toggle theme">
+    <span id="authThemeIcon" style="font-size:16px;">&#9788;</span>
+    <span id="authThemeLabel">Dark Mode</span>
+  </button>
   <div class="auth-card">
     <div class="auth-logo">
       <h1><span>Circle</span> for Life</h1>
@@ -582,13 +587,16 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
       <!-- Populated dynamically by JS based on user level -->
     </div>
     <div class="sidebar-footer">
+      <button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Toggle theme">
+        <span class="theme-icon" id="themeIcon">&#9788;</span>
+        <span id="themeLabel">Dark Mode</span>
+      </button>
       <div class="user-pill">
         <div class="user-avatar" id="sidebarAvatar">A</div>
         <div class="user-pill-info">
           <div class="user-pill-name" id="sidebarName">-</div>
           <div class="user-pill-role" id="sidebarRole">-</div>
         </div>
-        <button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Toggle theme">&#9788;</button>
         <button class="logout-btn" onclick="logout()" title="Logout">&times;</button>
       </div>
     </div>
@@ -674,7 +682,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
           <div style="padding:28px;text-align:center;">
             <!-- Avatar -->
             <div id="profileAvatarWrap" style="position:relative;display:inline-block;margin-bottom:16px;">
-              <div id="profileAvatar" style="width:96px;height:96px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--purple));display:flex;align-items:center;justify-content:center;font-size:38px;font-weight:700;color:#fff;margin:0 auto;overflow:hidden;box-shadow:0 4px 20px rgba(99,102,241,0.25);">
+              <div id="profileAvatar" style="width:96px;height:96px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--purple));display:flex;align-items:center;justify-content:center;font-size:38px;font-weight:700;color:#fff;margin:0 auto;overflow:hidden;box-shadow:0 4px 20px rgba(var(--accent-rgb),0.25);">
                 <img id="profileAvatarImg" style="width:100%;height:100%;object-fit:cover;display:none;">
                 <span id="profileAvatarLetter">?</span>
               </div>
@@ -1577,9 +1585,9 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
           <!-- Incoming Call Overlay -->
           <div id="p2pIncomingCallOverlay" style="display:none;position:absolute;top:0;left:0;right:0;bottom:0;z-index:60;background:linear-gradient(180deg,#0f0f23 0%,#1a1a3e 100%);border-radius:inherit;flex-direction:column;align-items:center;justify-content:center;gap:0;">
             <div style="position:absolute;top:0;left:0;right:0;bottom:0;overflow:hidden;border-radius:inherit;">
-              <div id="incomingCallRipple1" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-60%);width:120px;height:120px;border-radius:50%;border:2px solid rgba(99,102,241,0.3);animation:callRipple 2s ease-out infinite;"></div>
-              <div id="incomingCallRipple2" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-60%);width:120px;height:120px;border-radius:50%;border:2px solid rgba(99,102,241,0.3);animation:callRipple 2s ease-out 0.5s infinite;"></div>
-              <div id="incomingCallRipple3" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-60%);width:120px;height:120px;border-radius:50%;border:2px solid rgba(99,102,241,0.3);animation:callRipple 2s ease-out 1s infinite;"></div>
+              <div id="incomingCallRipple1" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-60%);width:120px;height:120px;border-radius:50%;border:2px solid rgba(var(--accent-rgb),0.3);animation:callRipple 2s ease-out infinite;"></div>
+              <div id="incomingCallRipple2" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-60%);width:120px;height:120px;border-radius:50%;border:2px solid rgba(var(--accent-rgb),0.3);animation:callRipple 2s ease-out 0.5s infinite;"></div>
+              <div id="incomingCallRipple3" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-60%);width:120px;height:120px;border-radius:50%;border:2px solid rgba(var(--accent-rgb),0.3);animation:callRipple 2s ease-out 1s infinite;"></div>
             </div>
             <div id="incomingCallAvatar" style="width:90px;height:90px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:700;color:#fff;margin-bottom:16px;border:3px solid rgba(255,255,255,0.2);z-index:1;animation:callPulse 1.5s ease-in-out infinite;">?</div>
             <div id="incomingCallName" style="color:#fff;font-size:20px;font-weight:700;margin-bottom:4px;z-index:1;"></div>
@@ -1677,7 +1685,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
         .call-header { text-align:center; padding:28px 20px 12px; }
         .call-avatar-ring { width:88px; height:88px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:38px; margin:0 auto 14px; border:3px solid rgba(255,255,255,0.15); position:relative; }
         .call-avatar-ring.speaking { animation:callSpeakPulse 1.2s ease-in-out infinite; }
-        @keyframes callSpeakPulse { 0%,100% { box-shadow:0 0 0 0 rgba(99,102,241,0.4); } 50% { box-shadow:0 0 0 18px rgba(99,102,241,0); } }
+        @keyframes callSpeakPulse { 0%,100% { box-shadow:0 0 0 0 rgba(var(--accent-rgb),0.4); } 50% { box-shadow:0 0 0 18px rgba(var(--accent-rgb),0); } }
         .call-agent-name { color:#fff; font-size:20px; font-weight:700; margin-bottom:2px; }
         .call-agent-specialty { color:rgba(255,255,255,0.45); font-size:12px; margin-bottom:4px; }
         .call-status { color:var(--accent); font-size:13px; font-weight:600; }
@@ -1730,7 +1738,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
             <div class="field"><label>Model (optional)</label><input type="text" id="agentLLMModel" placeholder="Default model"></div>
             <div class="field"><label>ElevenLabs Key (voice)</label><input type="password" id="agentElevenLabsKey" placeholder="Optional — enables voice"></div>
           </div>
-          <div id="agentKaggleHelp" style="display:none;margin-top:8px;padding:8px 12px;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.15);border-radius:8px;"><p style="font-size:11px;color:var(--text);margin:0 0 4px;font-weight:600;">Kaggle Setup (free GPU):</p><ol style="font-size:10px;color:var(--text2);margin:0;padding-left:16px;line-height:1.7;"><li>Create a Kaggle notebook with <strong>GPU + Internet</strong> enabled</li><li>Paste the <code>kaggle_ollama_setup.py</code> script and run it</li><li>Copy the <strong>ngrok URL</strong> and paste it above</li></ol></div>
+          <div id="agentKaggleHelp" style="display:none;margin-top:8px;padding:8px 12px;background:rgba(var(--accent-rgb),0.06);border:1px solid rgba(var(--accent-rgb),0.15);border-radius:8px;"><p style="font-size:11px;color:var(--text);margin:0 0 4px;font-weight:600;">Kaggle Setup (free GPU):</p><ol style="font-size:10px;color:var(--text2);margin:0;padding-left:16px;line-height:1.7;"><li>Create a Kaggle notebook with <strong>GPU + Internet</strong> enabled</li><li>Paste the <code>kaggle_ollama_setup.py</code> script and run it</li><li>Copy the <strong>ngrok URL</strong> and paste it above</li></ol></div>
           <p id="agentNonKaggleHelp" style="font-size:10px;color:var(--text3);margin:6px 0 0;">Without ElevenLabs, agents respond in text only. Web Speech handles voice input.</p>
         </div>
         <div class="agent-grid" id="agentGrid"></div>
@@ -2045,7 +2053,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
   color:#fff;border:none;cursor:pointer;
   display:flex;align-items:center;justify-content:center;
   font-size:24px;
-  box-shadow:0 4px 20px rgba(99,102,241,0.35);
+  box-shadow:0 4px 20px rgba(var(--accent-rgb),0.35);
   transition:all 0.3s ease;
 ">&#127908;</div>
 
@@ -2273,8 +2281,18 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
   }
   function updateThemeIcon() {
     var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    var btns = document.querySelectorAll('.theme-toggle, .hamburger[onclick="toggleTheme()"]');
-    btns.forEach(function(b) { b.innerHTML = isDark ? '&#9790;' : '&#9788;'; });
+    var icon = isDark ? '\u263E' : '\u2600';
+    var label = isDark ? 'Light Mode' : 'Dark Mode';
+    var iconEl = document.getElementById('themeIcon');
+    var labelEl = document.getElementById('themeLabel');
+    if (iconEl) iconEl.textContent = icon;
+    if (labelEl) labelEl.textContent = label;
+    var authIconEl = document.getElementById('authThemeIcon');
+    var authLabelEl = document.getElementById('authThemeLabel');
+    if (authIconEl) authIconEl.textContent = icon;
+    if (authLabelEl) authLabelEl.textContent = label;
+    var mobileBtn = document.querySelector('.hamburger[onclick="toggleTheme()"]');
+    if (mobileBtn) mobileBtn.textContent = icon;
   }
   updateThemeIcon();
 
@@ -2437,8 +2455,8 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
 
     // Level badge
     const badge = document.getElementById('profileBadge');
-    const badgeColors = { 1:'#6366f1', 2:'#3b82f6', 3:'#06b6d4', 4:'#10b981', 5:'#f59e0b', 6:'#f97316', 7:'#ef4444', 8:'#ec4899', 9:'#8b5cf6', 10:'#a855f7' };
-    const bgColor = badgeColors[lvl.level] || '#6366f1';
+    const badgeColors = { 1:'var(--accent)', 2:'#3b82f6', 3:'#06b6d4', 4:'#10b981', 5:'#f59e0b', 6:'#f97316', 7:'#ef4444', 8:'#ec4899', 9:'#8b5cf6', 10:'#a855f7' };
+    const bgColor = badgeColors[lvl.level] || 'var(--accent)';
     badge.style.background = bgColor + '22';
     badge.style.color = bgColor;
     badge.style.border = '1px solid ' + bgColor + '44';
@@ -2497,7 +2515,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     const allFeats = levelData?.unlockedFeatures || [];
     if (allFeats.length > 0) {
       featEl.innerHTML = allFeats.map(function(f) {
-        return '<span style="display:inline-block;padding:4px 10px;border-radius:12px;font-size:11px;font-weight:600;background:rgba(99,102,241,0.12);color:var(--accent);border:1px solid rgba(99,102,241,0.2);">' + f.replace(/_/g, ' ') + '</span>';
+        return '<span style="display:inline-block;padding:4px 10px;border-radius:12px;font-size:11px;font-weight:600;background:rgba(var(--accent-rgb),0.12);color:var(--accent);border:1px solid rgba(var(--accent-rgb),0.2);">' + f.replace(/_/g, ' ') + '</span>';
       }).join('');
     } else {
       featEl.innerHTML = '<span style="font-size:12px;color:var(--text3);">Level up to unlock features!</span>';
@@ -4983,7 +5001,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
         // AI indicators (show on ALL messages, not just received)
         let aiIndicators = '';
         if (m.toneFlag && m.toneFlag !== 'neutral') {
-          const toneColors = { angry: 'var(--red)', happy: 'var(--green)', sad: '#6366f1', frustrated: 'var(--orange)', sarcastic: '#f59e0b', anxious: '#8b5cf6' };
+          const toneColors = { angry: 'var(--red)', happy: 'var(--green)', sad: 'var(--accent)', frustrated: 'var(--orange)', sarcastic: '#f59e0b', anxious: '#8b5cf6' };
           const toneEmoji = { angry: '&#128545;', happy: '&#128522;', sad: '&#128546;', frustrated: '&#128553;', sarcastic: '&#128527;', anxious: '&#128552;' }[m.toneFlag] || '&#128172;';
           const tColor = toneColors[m.toneFlag] || 'var(--text3)';
           aiIndicators += '<div style="font-size:10px;color:' + tColor + ';margin-top:4px;">' + toneEmoji + ' ' + m.toneFlag + (m.toneSuggestion ? ' — ' + esc(m.toneSuggestion) : '') + '</div>';
@@ -5250,7 +5268,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
         data = await api('POST', '/v1/chat/ai/tone-check', { text });
       }
       const emoji = { angry: '&#128545;', happy: '&#128522;', sad: '&#128546;', neutral: '&#128578;', frustrated: '&#128553;', sarcastic: '&#128527;', anxious: '&#128552;' }[data.flag] || '&#128578;';
-      const color = { angry: 'var(--red)', frustrated: 'var(--orange)', sarcastic: '#f59e0b', sad: '#6366f1', happy: 'var(--green)' }[data.flag] || 'var(--text)';
+      const color = { angry: 'var(--red)', frustrated: 'var(--orange)', sarcastic: '#f59e0b', sad: 'var(--accent)', happy: 'var(--green)' }[data.flag] || 'var(--text)';
       result.innerHTML = emoji + ' <strong style="color:' + color + ';">Tone: ' + (data.flag || 'neutral') + '</strong>' + (data.suggestion ? '<br><span style="font-size:11px;color:var(--text3);">' + esc(data.suggestion) + '</span>' : '');
     } catch(e) { result.innerHTML = 'Error: ' + e.message; }
   }
@@ -6076,7 +6094,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
         var dur = s.endedAt ? Math.floor((new Date(s.endedAt) - new Date(s.startedAt)) / 1000) : 0;
         var durStr = dur > 0 ? Math.floor(dur/60) + ':' + String(dur%60).padStart(2,'0') : 'Active';
         var badge = s.status === 'escalated' ? '<span class="call-history-badge escalated">Escalated</span>' : '<span class="call-history-badge ended">' + s.status + '</span>';
-        var srcBadge = s.source === 'phone' ? ' <span style="background:rgba(99,102,241,0.12);color:var(--accent);font-size:8px;padding:1px 4px;border-radius:3px;">PHONE</span>' : '';
+        var srcBadge = s.source === 'phone' ? ' <span style="background:rgba(var(--accent-rgb),0.12);color:var(--accent);font-size:8px;padding:1px 4px;border-radius:3px;">PHONE</span>' : '';
         return '<div class="call-history-item">' +
           '<div class="call-history-avatar">' + (s.agentAvatar || '?') + '</div>' +
           '<div class="call-history-info">' +
@@ -6103,7 +6121,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
         var lastNote = c.supervisorNotes && c.supervisorNotes.length > 0 ? c.supervisorNotes[c.supervisorNotes.length-1] : null;
         var sevColor = lastNote ? (lastNote.severity === 'high' ? '#ef4444' : lastNote.severity === 'medium' ? '#f59e0b' : '#22c55e') : '#22c55e';
         var sourceIcon = c.source === 'phone' ? '&#128222; ' : '&#128187; ';
-        var sourceLabel = c.source === 'phone' ? '<span style="background:rgba(99,102,241,0.15);color:var(--accent);font-size:9px;padding:1px 5px;border-radius:4px;margin-left:4px;">PHONE</span>' : '';
+        var sourceLabel = c.source === 'phone' ? '<span style="background:rgba(var(--accent-rgb),0.15);color:var(--accent);font-size:9px;padding:1px 5px;border-radius:4px;margin-left:4px;">PHONE</span>' : '';
         return '<div class="admin-call-row">' +
           '<div class="live-dot" style="background:' + sevColor + ';"></div>' +
           '<div style="flex:1;">' +
@@ -6834,8 +6852,8 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
       transcriptEl.innerHTML = msgs.map(function(m) {
         var isUser = m.role === 'user';
         var isSystem = m.role === 'system';
-        var bgColor = isSystem ? 'rgba(239,68,68,0.08)' : (isUser ? 'rgba(99,102,241,0.08)' : 'var(--surface)');
-        var borderColor = isSystem ? 'rgba(239,68,68,0.2)' : (isUser ? 'rgba(99,102,241,0.2)' : 'var(--border)');
+        var bgColor = isSystem ? 'rgba(239,68,68,0.08)' : (isUser ? 'rgba(var(--accent-rgb),0.08)' : 'var(--surface)');
+        var borderColor = isSystem ? 'rgba(239,68,68,0.2)' : (isUser ? 'rgba(var(--accent-rgb),0.2)' : 'var(--border)');
         var label = isSystem ? 'SYSTEM' : (isUser ? (c.source === 'phone' ? 'CALLER' : 'USER') : c.agentName);
         var labelColor = isSystem ? '#ef4444' : (isUser ? 'var(--accent)' : '#22c55e');
         var time = m.timestamp ? new Date(m.timestamp).toLocaleTimeString() : '';
@@ -7226,13 +7244,13 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
 <!-- ═══ GLOBAL INCOMING CALL OVERLAY (visible across all pages) ═══ -->
 <div id="globalIncomingCallOverlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:10000;background:linear-gradient(180deg,#0f0f23 0%,#1a1a3e 100%);flex-direction:column;align-items:center;justify-content:center;gap:0;">
   <style>
-    @keyframes globalCallPulse { 0%,100% { transform:scale(1); box-shadow:0 0 0 0 rgba(99,102,241,0.4); } 50% { transform:scale(1.06); box-shadow:0 0 0 18px rgba(99,102,241,0); } }
+    @keyframes globalCallPulse { 0%,100% { transform:scale(1); box-shadow:0 0 0 0 rgba(var(--accent-rgb),0.4); } 50% { transform:scale(1.06); box-shadow:0 0 0 18px rgba(var(--accent-rgb),0); } }
     @keyframes globalCallRipple { 0% { width:120px;height:120px;opacity:0.6; } 100% { width:260px;height:260px;opacity:0; } }
   </style>
   <div style="position:absolute;top:0;left:0;right:0;bottom:0;overflow:hidden;">
-    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-55%);width:120px;height:120px;border-radius:50%;border:2px solid rgba(99,102,241,0.3);animation:globalCallRipple 2s ease-out infinite;"></div>
-    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-55%);width:120px;height:120px;border-radius:50%;border:2px solid rgba(99,102,241,0.3);animation:globalCallRipple 2s ease-out 0.5s infinite;"></div>
-    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-55%);width:120px;height:120px;border-radius:50%;border:2px solid rgba(99,102,241,0.3);animation:globalCallRipple 2s ease-out 1s infinite;"></div>
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-55%);width:120px;height:120px;border-radius:50%;border:2px solid rgba(var(--accent-rgb),0.3);animation:globalCallRipple 2s ease-out infinite;"></div>
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-55%);width:120px;height:120px;border-radius:50%;border:2px solid rgba(var(--accent-rgb),0.3);animation:globalCallRipple 2s ease-out 0.5s infinite;"></div>
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-55%);width:120px;height:120px;border-radius:50%;border:2px solid rgba(var(--accent-rgb),0.3);animation:globalCallRipple 2s ease-out 1s infinite;"></div>
   </div>
   <div id="globalIncomingAvatar" style="width:100px;height:100px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:40px;font-weight:700;color:#fff;margin-bottom:20px;border:3px solid rgba(255,255,255,0.2);z-index:1;animation:globalCallPulse 1.5s ease-in-out infinite;">?</div>
   <div id="globalIncomingName" style="color:#fff;font-size:24px;font-weight:700;margin-bottom:6px;z-index:1;"></div>
