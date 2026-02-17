@@ -489,6 +489,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
       .modal { padding: 16px; }
     }
   </style>
+  <script src="https://sdk.twilio.com/js/client/releases/1.14/twilio.min.js" defer></script>
 </head>
 <body>
 
@@ -6054,6 +6055,9 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
   var deepgramSocket = null;          // Deepgram WebSocket for STT
   var deepgramMediaRecorder = null;   // MediaRecorder for Deepgram STT
   var agentAdminPollTimer = null;
+  var twilioDevice = null;            // Twilio Voice Device for live bridge
+  var twilioConnection = null;        // Active Twilio voice connection
+  var liveBridgeActive = false;       // Whether live bridge is active
 
   function loadAgentPage() {
     loadAgentGrid();
@@ -6798,24 +6802,85 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     try {
       setCallStatus('Escalating to human...', 'thinking');
       stopAgentListening();
+      animateWaveform(false);
+      if (agentCallAudio) { agentCallAudio.pause(); agentCallAudio = null; }
+      if (window.speechSynthesis) window.speechSynthesis.cancel();
+
       var d = await api('POST', '/v1/agent-calls/' + agentCallSession.id + '/escalate');
       appendCallMessage('system', d.message);
-      if (d.method === 'twilio_call_placed') {
-        toast('Phone call placed to admin! They will receive a call shortly.', 'ok');
+
+      if (d.method === 'live_bridge' && d.twilioToken && typeof Twilio !== 'undefined') {
+        // Live voice bridge — connect browser to Twilio conference
+        toast('Calling admin... You will be connected directly.', 'ok');
+        setCallStatus('Calling admin...', 'thinking');
+        appendCallMessage('system', 'Ringing admin phone. You will be connected when they answer.');
+
+        try {
+          twilioDevice = new Twilio.Device(d.twilioToken, { debug: false });
+
+          twilioDevice.on('ready', function() {
+            console.log('Twilio Device ready, connecting to conference...');
+            twilioConnection = twilioDevice.connect({ sessionId: agentCallSession.id });
+          });
+
+          twilioDevice.on('connect', function(conn) {
+            console.log('Twilio: connected to conference');
+            twilioConnection = conn;
+            liveBridgeActive = true;
+            setCallStatus('Connected to admin', 'speaking');
+            appendCallMessage('system', 'You are now connected with a real person. Speak normally.');
+            toast('Connected to admin!', 'ok');
+            animateWaveform(true);
+          });
+
+          twilioDevice.on('disconnect', function() {
+            console.log('Twilio: disconnected from conference');
+            liveBridgeActive = false;
+            twilioConnection = null;
+            setCallStatus('Admin disconnected', 'default');
+            appendCallMessage('system', 'The admin has disconnected. You can continue talking to the AI agent or end the call.');
+            animateWaveform(false);
+            toast('Admin disconnected', 'ok');
+            // Resume AI agent listening
+            agentCallProcessing = false;
+            setTimeout(function() { startAgentListening(); }, 1000);
+          });
+
+          twilioDevice.on('error', function(err) {
+            console.error('Twilio Device error:', err);
+            liveBridgeActive = false;
+            setCallStatus('Bridge error', 'default');
+            appendCallMessage('system', 'Could not connect to admin. Resuming AI agent.');
+            toast('Voice bridge error: ' + (err.message || 'Unknown'), 'err');
+            agentCallProcessing = false;
+            startAgentListening();
+          });
+
+        } catch(twilioErr) {
+          console.error('Twilio setup failed:', twilioErr);
+          toast('Voice bridge setup failed. Admin was still called.', 'err');
+          setCallStatus('Admin called (no bridge)', 'default');
+          agentCallProcessing = false;
+          startAgentListening();
+        }
+
+      } else if (d.method === 'twilio_call_placed') {
+        toast('Phone call placed to admin.', 'ok');
         setCallStatus('Admin notified via phone', 'default');
-      } else if (d.method === 'twilio_failed_notification_sent') {
-        toast('Admin notified in the system. Phone call could not be placed.', 'err');
-        setCallStatus('Escalated', 'default');
+        speakAgentResponse('Your request has been escalated. An admin has been notified via phone.', function() {
+          agentCallProcessing = false;
+          setCallStatus('Escalated — still connected', 'default');
+          startAgentListening();
+        });
       } else {
         toast(d.message, 'ok');
         setCallStatus('Escalated', 'default');
+        speakAgentResponse('Your request has been escalated. An admin will review your case.', function() {
+          agentCallProcessing = false;
+          setCallStatus('Escalated — still connected', 'default');
+          startAgentListening();
+        });
       }
-      // Speak an escalation confirmation and then keep the call alive for the user
-      speakAgentResponse('Your request has been escalated. An admin has been notified. You can continue talking to me or end the call.', function() {
-        agentCallProcessing = false;
-        setCallStatus('Escalated — still connected', 'default');
-        startAgentListening();
-      });
     } catch(e) {
       toast('Escalation failed: ' + e.message, 'err');
       setCallStatus('Escalation failed', 'default');
@@ -6826,6 +6891,11 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
 
   async function endAgentCall() {
     if (!agentCallSession) return;
+
+    // Disconnect Twilio live bridge if active
+    if (twilioConnection) { try { twilioConnection.disconnect(); } catch(e) {} twilioConnection = null; }
+    if (twilioDevice) { try { twilioDevice.destroy(); } catch(e) {} twilioDevice = null; }
+    liveBridgeActive = false;
 
     stopAgentListening();
     if (agentCallTimer) { clearInterval(agentCallTimer); agentCallTimer = null; }

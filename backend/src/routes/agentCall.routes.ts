@@ -15,9 +15,13 @@ import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { createHmac } from 'crypto';
 import axios from 'axios';
+import twilio from 'twilio';
 import { localAuthenticate, requirePermission } from '../middleware/rbac.middleware.js';
 import { ControlPanelService, type ChatMessage, type ProviderConfig } from '../services/controlPanel.service.js';
 import { logger } from '../utils/logger.js';
+
+const { jwt: { AccessToken } } = twilio;
+const VoiceGrant = AccessToken.VoiceGrant;
 
 // ─── Twilio Webhook Signature Validation ─────────────────────────────────────
 
@@ -813,7 +817,7 @@ export async function agentCallRoutes(app: FastifyInstance) {
     };
   });
 
-  // ═══ POST /:id/escalate — Trigger escalation to human ════════════════════
+  // ═══ POST /:id/escalate — Trigger escalation with live voice bridge ═════
   app.post('/:id/escalate', {
     preHandler: [localAuthenticate],
   }, async (request: any, reply) => {
@@ -823,11 +827,65 @@ export async function agentCallRoutes(app: FastifyInstance) {
     if (session.userId !== request.userId) return reply.status(403).send({ error: { message: 'Not your session' } });
 
     session.status = 'escalated';
-
     const agent = AGENTS.find(a => a.id === session.agentId)!;
-    const escalationResult = await triggerTwilioEscalation(session, agent);
 
-    // Add escalation note to transcript
+    // Try live voice bridge first, fall back to notification-only
+    const voiceResources = await ensureTwilioVoiceResources();
+    const twilioSid = process.env.TWILIO_ACCOUNT_SID;
+    const twilioToken = process.env.TWILIO_AUTH_TOKEN;
+    const twilioFrom = process.env.TWILIO_PHONE_NUMBER;
+    const adminPhone = process.env.ADMIN_PHONE_NUMBER;
+
+    if (voiceResources && twilioSid && twilioToken && twilioFrom && adminPhone) {
+      try {
+        const conferenceName = `escalation_${id}_${Date.now()}`;
+        escalationConferences.set(id, { conferenceName, userConnected: false, adminConnected: false });
+
+        // Generate access token for the browser user
+        const accessToken = new AccessToken(twilioSid, voiceResources.apiKeySid, voiceResources.apiKeySecret, {
+          identity: `user_${session.userId}_${id}`,
+          ttl: 3600,
+        });
+        accessToken.addGrant(new VoiceGrant({
+          outgoingApplicationSid: voiceResources.twimlAppSid,
+          incomingAllow: false,
+        }));
+
+        // Call the admin's phone and connect to the conference
+        const serverUrl = getSecureServerUrl();
+        const client = twilio(twilioSid, twilioToken);
+        const adminCall = await client.calls.create({
+          to: adminPhone,
+          from: twilioFrom,
+          twiml: `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="alice">Incoming escalation from Circle for Life. User ${escapeXml(session.userName)} was speaking with ${escapeXml(agent.name)}. Connecting you now.</Say><Dial><Conference waitUrl="" beep="true" startConferenceOnEnter="true" endConferenceOnExit="true">${escapeXml(conferenceName)}</Conference></Dial></Response>`,
+          statusCallback: serverUrl ? `${serverUrl}/v1/agent-calls/escalate/admin-status?session=${encodeURIComponent(id)}` : undefined,
+          statusCallbackEvent: ['completed', 'no-answer', 'busy', 'failed'],
+        });
+
+        escalationConferences.get(id)!.adminCallSid = adminCall.sid;
+        logger.info(`Live bridge: admin call placed (SID=${adminCall.sid}), conference=${conferenceName}`);
+
+        session.transcript.push({
+          role: 'system',
+          text: 'Live voice bridge initiated. Admin is being called and will be connected directly.',
+          timestamp: new Date().toISOString(),
+        });
+
+        return {
+          status: 'escalated',
+          method: 'live_bridge',
+          conferenceName,
+          twilioToken: accessToken.toJwt(),
+          message: 'Calling admin now. You will be connected directly when they pick up.',
+        };
+      } catch (e: any) {
+        logger.error('Live bridge failed, falling back to notification:', e.message);
+        escalationConferences.delete(id);
+      }
+    }
+
+    // Fallback: old notification-only escalation
+    const escalationResult = await triggerTwilioEscalation(session, agent);
     session.transcript.push({
       role: 'system',
       text: `Call escalated to human support. ${escalationResult === 'twilio_call_placed' ? 'An admin has been notified via phone call.' : 'An admin notification has been sent.'}`,
@@ -840,6 +898,59 @@ export async function agentCallRoutes(app: FastifyInstance) {
       message: escalationResult === 'twilio_call_placed'
         ? 'A human support agent has been notified and will connect with you shortly.'
         : 'Your request has been escalated. An admin will review your case.',
+    };
+  });
+
+  // ═══ POST /escalate/voice-webhook — TwiML for browser user joining conference ═
+  app.post('/escalate/voice-webhook', async (request: any, reply) => {
+    const body = request.body as any;
+    const sessionId = body?.sessionId || '';
+    const conf = escalationConferences.get(sessionId);
+
+    if (!conf) {
+      logger.warn('Voice webhook: no conference found for session', sessionId);
+      return reply.type('text/xml').send('<?xml version="1.0" encoding="UTF-8"?><Response><Say>No active escalation found.</Say></Response>');
+    }
+
+    conf.userConnected = true;
+    logger.info(`Voice webhook: user joined conference ${conf.conferenceName}`);
+
+    return reply.type('text/xml').send(
+      `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="alice">Connecting you to the admin now. Please hold.</Say><Dial><Conference waitUrl="" beep="true" startConferenceOnEnter="true">${escapeXml(conf.conferenceName)}</Conference></Dial></Response>`
+    );
+  });
+
+  // ═══ POST /escalate/admin-status — Admin call status callback ══════════════
+  app.post('/escalate/admin-status', async (request: any, reply) => {
+    const body = request.body as any;
+    const sessionId = (request.query as any)?.session || '';
+    const callStatus = body?.CallStatus || '';
+
+    logger.info(`Admin call status: ${callStatus} for session ${sessionId}`);
+
+    if (['completed', 'no-answer', 'busy', 'failed', 'canceled'].includes(callStatus)) {
+      const conf = escalationConferences.get(sessionId);
+      if (conf) {
+        conf.adminConnected = false;
+        logger.info(`Admin disconnected from conference ${conf.conferenceName}`);
+      }
+    }
+
+    return reply.status(200).send('OK');
+  });
+
+  // ═══ GET /escalate/status/:id — Check escalation bridge status ═════════════
+  app.get('/escalate/status/:id', {
+    preHandler: [localAuthenticate],
+  }, async (request: any) => {
+    const { id } = request.params as any;
+    const conf = escalationConferences.get(id);
+    if (!conf) return { active: false };
+    return {
+      active: true,
+      conferenceName: conf.conferenceName,
+      adminConnected: conf.adminConnected,
+      userConnected: conf.userConnected,
     };
   });
 
@@ -1591,6 +1702,61 @@ export async function agentCallRoutes(app: FastifyInstance) {
 // ─── Supervisor Analysis ─────────────────────────────────────────────────────
 
 // ─── Twilio Escalation Helper ──────────────────────────────────────────────
+
+// ─── Twilio Voice Bridge: Auto-provisioning + Conference ─────────────────
+
+let _twilioApiKeySid: string | null = null;
+let _twilioApiKeySecret: string | null = null;
+let _twilioTwimlAppSid: string | null = null;
+
+async function ensureTwilioVoiceResources(): Promise<{ apiKeySid: string; apiKeySecret: string; twimlAppSid: string } | null> {
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  if (!sid || !token) return null;
+
+  // Use cached values if available
+  if (_twilioApiKeySid && _twilioApiKeySecret && _twilioTwimlAppSid) {
+    return { apiKeySid: _twilioApiKeySid, apiKeySecret: _twilioApiKeySecret, twimlAppSid: _twilioTwimlAppSid };
+  }
+
+  // Check env first
+  if (process.env.TWILIO_API_KEY_SID && process.env.TWILIO_API_KEY_SECRET && process.env.TWILIO_TWIML_APP_SID) {
+    _twilioApiKeySid = process.env.TWILIO_API_KEY_SID;
+    _twilioApiKeySecret = process.env.TWILIO_API_KEY_SECRET;
+    _twilioTwimlAppSid = process.env.TWILIO_TWIML_APP_SID;
+    return { apiKeySid: _twilioApiKeySid, apiKeySecret: _twilioApiKeySecret, twimlAppSid: _twilioTwimlAppSid };
+  }
+
+  try {
+    const client = twilio(sid, token);
+    const serverUrl = getSecureServerUrl();
+
+    // Auto-create TwiML App
+    logger.info('Auto-provisioning Twilio TwiML App...');
+    const app = await client.applications.create({
+      friendlyName: 'Circle for Life Voice Bridge',
+      voiceUrl: `${serverUrl}/v1/agent-calls/escalate/voice-webhook`,
+      voiceMethod: 'POST',
+    });
+    _twilioTwimlAppSid = app.sid;
+    logger.info(`TwiML App created: ${app.sid}`);
+
+    // Auto-create API Key
+    logger.info('Auto-provisioning Twilio API Key...');
+    const key = await client.newKeys.create({ friendlyName: 'Circle for Life Voice Key' });
+    _twilioApiKeySid = key.sid;
+    _twilioApiKeySecret = key.secret;
+    logger.info(`API Key created: ${key.sid}`);
+
+    return { apiKeySid: _twilioApiKeySid!, apiKeySecret: _twilioApiKeySecret!, twimlAppSid: _twilioTwimlAppSid! };
+  } catch (e: any) {
+    logger.error('Failed to auto-provision Twilio resources:', e.message);
+    return null;
+  }
+}
+
+// Conference rooms mapped by session ID
+const escalationConferences = new Map<string, { conferenceName: string; adminCallSid?: string; userConnected: boolean; adminConnected: boolean }>();
 
 async function triggerTwilioEscalation(session: CallSession, agent: AgentDef): Promise<string> {
   const twilioSid = process.env.TWILIO_ACCOUNT_SID;
