@@ -453,7 +453,7 @@ export async function agentCallRoutes(app: FastifyInstance) {
       agentId: z.string(),
       provider: z.object({
         provider: z.string(),
-        apiKey: z.string(),
+        apiKey: z.string().optional(),
         model: z.string().optional(),
         baseUrl: z.string().optional(),
       }).optional(),
@@ -464,7 +464,7 @@ export async function agentCallRoutes(app: FastifyInstance) {
     if (!agent) return reply.status(404).send({ error: { message: 'Agent not found' } });
 
     const userId = request.userId;
-    const user = request.userData || {};
+    const user = request.user || request.userData || {};
 
     // Check if user already has an active session
     for (const [, sess] of activeSessions) {
@@ -488,11 +488,18 @@ export async function agentCallRoutes(app: FastifyInstance) {
       supervisorNotes: [],
       providerConfig: (() => {
         if (!body.provider || body.provider.provider === 'server_default') return getPhoneCallProvider();
+        if (!body.provider.apiKey?.trim()) return getPhoneCallProvider();
         // If kaggle/ollama is specified but baseUrl looks invalid, fallback to server default
-        if (body.provider.provider === 'kaggle' && body.provider.baseUrl) {
-          try { new URL(body.provider.baseUrl); } catch { return getPhoneCallProvider(); }
+        const baseUrl = body.provider.baseUrl?.trim() || undefined;
+        if (body.provider.provider === 'kaggle' && baseUrl) {
+          try { new URL(baseUrl); } catch { return getPhoneCallProvider(); }
         }
-        return body.provider as ProviderConfig;
+        return {
+          provider: body.provider.provider as any,
+          apiKey: body.provider.apiKey.trim(),
+          model: body.provider.model?.trim() || undefined,
+          baseUrl,
+        };
       })(),
       elevenLabsKey: body.elevenLabsKey || process.env.ELEVENLABS_API_KEY || '',
       startedAt: now,
@@ -588,61 +595,57 @@ export async function agentCallRoutes(app: FastifyInstance) {
     ];
 
     let responseText = '';
+    let llmSucceeded = false;
+    let llmError: any = null;
 
-    // Try configured provider first, then fallback to server default (Groq), then error
-    if (session.providerConfig && session.providerConfig.apiKey) {
+    const primaryProvider = (session.providerConfig && session.providerConfig.apiKey)
+      ? session.providerConfig
+      : null;
+
+    // Try session/provider from request first.
+    if (primaryProvider) {
       try {
         const resp = await ControlPanelService.chat({
-          provider: session.providerConfig,
+          provider: primaryProvider,
           messages: llmMessages,
           maxTokens: 256,
           temperature: 0.7,
         });
         responseText = resp.content;
+        llmSucceeded = true;
       } catch (e: any) {
-        logger.error('Agent LLM error (primary):', e.error || e.message);
-        // Fallback: try server-default provider (Groq)
-        const fallback = getPhoneCallProvider();
-        if (fallback && fallback.apiKey && fallback.provider !== session.providerConfig.provider) {
-          try {
-            logger.info(`Agent LLM fallback to ${fallback.provider}/${fallback.model}`);
-            session.providerConfig = fallback;
-            const resp2 = await ControlPanelService.chat({
-              provider: fallback,
-              messages: llmMessages,
-              maxTokens: 256,
-              temperature: 0.7,
-            });
-            responseText = resp2.content;
-          } catch (e2: any) {
-            logger.error('Agent LLM fallback also failed:', e2.error || e2.message);
-            responseText = "I'm sorry, I'm having a technical issue right now. Could you repeat that?";
-          }
-        } else {
-          responseText = "I'm sorry, I'm having a technical issue right now. Could you repeat that?";
-        }
+        llmError = e;
+        logger.error(`Agent LLM error (primary): ${e?.error || e?.message || 'unknown error'}`);
       }
-    } else {
-      // No provider configured — try server default
+    }
+
+    // Fallback to server/default provider, even when provider name matches, as long as config differs.
+    if (!llmSucceeded) {
       const fallback = getPhoneCallProvider();
-      if (fallback && fallback.apiKey) {
+      const canUseFallback = !!(fallback && fallback.apiKey) && !isSameProviderConfig(primaryProvider, fallback);
+      if (canUseFallback && fallback) {
         try {
-          logger.info(`Agent: no provider set, using server default ${fallback.provider}/${fallback.model}`);
-          session.providerConfig = fallback;
+          logger.info(`Agent LLM fallback to ${fallback.provider}/${fallback.model || 'default'}`);
           const resp = await ControlPanelService.chat({
             provider: fallback,
             messages: llmMessages,
             maxTokens: 256,
             temperature: 0.7,
           });
+          session.providerConfig = fallback;
           responseText = resp.content;
+          llmSucceeded = true;
         } catch (e: any) {
-          logger.error('Agent LLM server-default error:', e.error || e.message);
-          responseText = "I'm sorry, I'm having a technical issue right now. Could you repeat that?";
+          llmError = e;
+          logger.error(`Agent LLM fallback failed: ${e?.error || e?.message || 'unknown error'}`);
         }
-      } else {
+      } else if (!primaryProvider && !fallback) {
         responseText = "I'd love to help, but I need an AI provider to be configured. Please set up an API key in the settings to enable my full capabilities.";
       }
+    }
+
+    if (!llmSucceeded && !responseText) {
+      responseText = formatLlmUserMessage(llmError);
     }
 
     // Strip action markers like *gentle tone*, *smiles*, etc. that LLMs sometimes add
@@ -659,35 +662,37 @@ export async function agentCallRoutes(app: FastifyInstance) {
     // Run supervisor analysis and check for auto-escalation
     let autoEscalated = false;
     let autoEscalationMessage = '';
-    try {
-      await supervisorAnalyze(session, body.text, responseText);
+    if (llmSucceeded) {
+      try {
+        await supervisorAnalyze(session, body.text, responseText);
 
-      // Check if supervisor flagged high-severity escalation
-      const latest = session.supervisorNotes.length > 0
-        ? session.supervisorNotes[session.supervisorNotes.length - 1]
-        : null;
+        // Check if supervisor flagged high-severity escalation
+        const latest = session.supervisorNotes.length > 0
+          ? session.supervisorNotes[session.supervisorNotes.length - 1]
+          : null;
 
-      if (latest && latest.escalationNeeded && latest.severity === 'high' && session.status === 'active') {
-        // Auto-escalate: the supervisor detected urgent need for a real human
-        logger.info(`AUTO-ESCALATION triggered for session ${id}: ${latest.reason}`);
+        if (latest && latest.escalationNeeded && latest.severity === 'high' && session.status === 'active') {
+          // Auto-escalate: the supervisor detected urgent need for a real human
+          logger.info(`AUTO-ESCALATION triggered for session ${id}: ${latest.reason}`);
 
-        const escalationResult = await triggerTwilioEscalation(session, agent);
-        autoEscalated = true;
-        session.status = 'escalated';
+          const escalationResult = await triggerTwilioEscalation(session, agent);
+          autoEscalated = true;
+          session.status = 'escalated';
 
-        // Add a compassionate system message
-        const systemMsg = latest.flags?.includes('self_harm')
-          ? "I can hear you're going through something really serious. I've connected you with a real person who can help. They're being notified right now and will reach out to you shortly. You're not alone."
-          : "I can tell this is really important to you, and I want to make sure you get the best help possible. I've connected you with a real person who's being notified right now. They'll be in touch shortly.";
+          // Add a compassionate system message
+          const systemMsg = latest.flags?.includes('self_harm')
+            ? "I can hear you're going through something really serious. I've connected you with a real person who can help. They're being notified right now and will reach out to you shortly. You're not alone."
+            : "I can tell this is really important to you, and I want to make sure you get the best help possible. I've connected you with a real person who's being notified right now. They'll be in touch shortly.";
 
-        session.transcript.push({ role: 'system', text: systemMsg, timestamp: new Date().toISOString() });
-        autoEscalationMessage = systemMsg;
+          session.transcript.push({ role: 'system', text: systemMsg, timestamp: new Date().toISOString() });
+          autoEscalationMessage = systemMsg;
 
-        logger.info(`Auto-escalation complete for session ${id}: ${escalationResult}`);
+          logger.info(`Auto-escalation complete for session ${id}: ${escalationResult}`);
+        }
+      } catch (e: any) {
+        // Supervisor/escalation errors shouldn't break the message flow
+        logger.error('Supervisor/auto-escalation error:', e.message || e);
       }
-    } catch (e: any) {
-      // Supervisor/escalation errors shouldn't break the message flow
-      logger.error('Supervisor/auto-escalation error:', e.message || e);
     }
 
     return {
@@ -1148,33 +1153,63 @@ export async function agentCallRoutes(app: FastifyInstance) {
     // Get AI response
     let responseText = "I'm sorry, I couldn't process that. Could you try again?";
     let llmFailed = false;
+    let llmError: any = null;
+    const messages: ChatMessage[] = [
+      { role: 'system', content: agent!.systemPrompt },
+      ...session.transcript.filter(t => t.role !== 'system').map(t => ({
+        role: t.role === 'agent' ? 'assistant' as const : 'user' as const,
+        content: t.text,
+      })),
+    ];
+    const primaryProvider = (session.providerConfig && session.providerConfig.apiKey)
+      ? session.providerConfig
+      : null;
 
-    if (session.providerConfig && session.providerConfig.apiKey) {
+    if (primaryProvider) {
       try {
-        const messages: ChatMessage[] = [
-          { role: 'system', content: agent!.systemPrompt },
-          ...session.transcript.filter(t => t.role !== 'system').map(t => ({
-            role: t.role === 'agent' ? 'assistant' as const : 'user' as const,
-            content: t.text,
-          })),
-        ];
-
-        logger.info(`Phone LLM call: provider=${session.providerConfig.provider}, model=${session.providerConfig.model || 'default'}, baseUrl=${session.providerConfig.baseUrl || 'none'}`);
-
+        logger.info(`Phone LLM call: provider=${primaryProvider.provider}, model=${primaryProvider.model || 'default'}, baseUrl=${primaryProvider.baseUrl || 'none'}`);
         const resp = await ControlPanelService.chat({
-          provider: session.providerConfig,
+          provider: primaryProvider,
           messages,
           maxTokens: 250,
           temperature: 0.7,
         });
         responseText = resp.content;
       } catch (e: any) {
-        logger.error('Phone AI error:', e.message, e.response?.status, e.response?.data);
+        llmError = e;
         llmFailed = true;
+        logger.error(`Phone AI error (primary): ${e?.error || e?.message || 'unknown error'}`);
       }
     } else {
-      logger.error('Phone call: No LLM provider configured for session', sessionId);
       llmFailed = true;
+    }
+
+    if (llmFailed) {
+      const fallback = getPhoneCallProvider();
+      const canUseFallback = !!(fallback && fallback.apiKey) && !isSameProviderConfig(primaryProvider, fallback);
+      if (canUseFallback && fallback) {
+        try {
+          logger.info(`Phone LLM fallback: provider=${fallback.provider}, model=${fallback.model || 'default'}, baseUrl=${fallback.baseUrl || 'none'}`);
+          const resp = await ControlPanelService.chat({
+            provider: fallback,
+            messages,
+            maxTokens: 250,
+            temperature: 0.7,
+          });
+          session.providerConfig = fallback;
+          responseText = resp.content;
+          llmFailed = false;
+        } catch (e: any) {
+          llmError = e;
+          logger.error(`Phone AI error (fallback): ${e?.error || e?.message || 'unknown error'}`);
+        }
+      }
+    }
+
+    if (llmFailed && !primaryProvider) {
+      logger.error(`Phone call: no LLM provider configured for session ${sessionId}`);
+    } else if (llmFailed) {
+      logger.error(`Phone call LLM unavailable for session ${sessionId}: ${llmError?.error || llmError?.message || 'unknown error'}`);
     }
 
     // If LLM failed, try to connect to a real person
@@ -1906,6 +1941,38 @@ function escapeXml(str: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&apos;');
+}
+
+function isSameProviderConfig(a: ProviderConfig | null | undefined, b: ProviderConfig | null | undefined): boolean {
+  if (!a || !b) return false;
+  return (
+    a.provider === b.provider &&
+    (a.apiKey || '').trim() === (b.apiKey || '').trim() &&
+    (a.model || '').trim() === (b.model || '').trim() &&
+    (a.baseUrl || '').trim() === (b.baseUrl || '').trim()
+  );
+}
+
+function formatLlmUserMessage(err: any): string {
+  const status = Number(err?.status || err?.response?.status || 0);
+  const raw = String(err?.error || err?.message || err?.response?.data?.error?.message || '');
+  const msg = raw.toLowerCase();
+
+  if (
+    status === 401 ||
+    status === 403 ||
+    msg.includes('invalid api key') ||
+    msg.includes('authentication') ||
+    msg.includes('unauthorized')
+  ) {
+    return "I'm having trouble authenticating with the AI provider. Please check your provider API key in settings and try again.";
+  }
+
+  if (status === 429 || msg.includes('rate limit') || msg.includes('quota')) {
+    return "I'm currently being rate-limited by the AI provider. Please wait a moment and try again.";
+  }
+
+  return "I'm sorry, I'm having a technical issue right now. Could you repeat that?";
 }
 
 // ─── Phone Call Provider Configuration ────────────────────────────────────────
