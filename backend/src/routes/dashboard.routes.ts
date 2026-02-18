@@ -489,7 +489,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
       .modal { padding: 16px; }
     }
   </style>
-  <script src="https://sdk.twilio.com/js/client/releases/1.14/twilio.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@twilio/voice-sdk@2.10.0/dist/twilio.min.js" defer></script>
 </head>
 <body>
 
@@ -6816,24 +6816,15 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
         appendCallMessage('system', 'Ringing admin phone. You will be connected when they answer.');
 
         try {
+          if (!Twilio.Device || typeof Twilio.Device !== 'function') {
+            throw new Error('Twilio Voice SDK unavailable');
+          }
+
           twilioDevice = new Twilio.Device(d.twilioToken, { debug: false });
+          var connectStarted = false;
 
-          twilioDevice.on('ready', function() {
-            console.log('Twilio Device ready, connecting to conference...');
-            twilioConnection = twilioDevice.connect({ sessionId: agentCallSession.id });
-          });
-
-          twilioDevice.on('connect', function(conn) {
-            console.log('Twilio: connected to conference');
-            twilioConnection = conn;
-            liveBridgeActive = true;
-            setCallStatus('Connected to admin', 'speaking');
-            appendCallMessage('system', 'You are now connected with a real person. Speak normally.');
-            toast('Connected to admin!', 'ok');
-            animateWaveform(true);
-          });
-
-          twilioDevice.on('disconnect', function() {
+          function handleBridgeDisconnected() {
+            if (!liveBridgeActive && !twilioConnection) return;
             console.log('Twilio: disconnected from conference');
             liveBridgeActive = false;
             twilioConnection = null;
@@ -6844,17 +6835,62 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
             // Resume AI agent listening
             agentCallProcessing = false;
             setTimeout(function() { startAgentListening(); }, 1000);
-          });
+          }
 
-          twilioDevice.on('error', function(err) {
+          function handleBridgeConnected(conn) {
+            if (liveBridgeActive) return;
+            console.log('Twilio: connected to conference');
+            twilioConnection = conn || twilioConnection;
+            liveBridgeActive = true;
+            setCallStatus('Connected to admin', 'speaking');
+            appendCallMessage('system', 'You are now connected with a real person. Speak normally.');
+            toast('Connected to admin!', 'ok');
+            animateWaveform(true);
+            if (conn && typeof conn.on === 'function') {
+              conn.on('disconnect', handleBridgeDisconnected);
+              conn.on('cancel', handleBridgeDisconnected);
+            }
+          }
+
+          function handleBridgeError(err) {
             console.error('Twilio Device error:', err);
             liveBridgeActive = false;
             setCallStatus('Bridge error', 'default');
             appendCallMessage('system', 'Could not connect to admin. Resuming AI agent.');
-            toast('Voice bridge error: ' + (err.message || 'Unknown'), 'err');
+            toast('Voice bridge error: ' + ((err && err.message) || 'Unknown'), 'err');
             agentCallProcessing = false;
             startAgentListening();
-          });
+          }
+
+          function connectToConference() {
+            if (connectStarted || !agentCallSession) return;
+            connectStarted = true;
+            console.log('Twilio Device connecting to conference...');
+            try {
+              var connectResult = twilioDevice.connect({ params: { sessionId: agentCallSession.id } });
+              if (connectResult && typeof connectResult.then === 'function') {
+                connectResult.then(handleBridgeConnected).catch(handleBridgeError);
+              } else if (connectResult) {
+                twilioConnection = connectResult;
+              }
+            } catch (connectErr) {
+              handleBridgeError(connectErr);
+            }
+          }
+
+          twilioDevice.on('registered', connectToConference);
+          twilioDevice.on('ready', connectToConference); // backwards-compat for older SDK events
+          twilioDevice.on('connect', handleBridgeConnected);
+          twilioDevice.on('disconnect', handleBridgeDisconnected);
+          twilioDevice.on('error', handleBridgeError);
+
+          if (typeof twilioDevice.register === 'function') {
+            twilioDevice.register().catch(handleBridgeError);
+            // Some SDK builds can connect before/without explicit register event.
+            setTimeout(connectToConference, 1500);
+          } else {
+            connectToConference();
+          }
 
         } catch(twilioErr) {
           console.error('Twilio setup failed:', twilioErr);
