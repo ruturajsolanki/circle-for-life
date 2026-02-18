@@ -343,6 +343,25 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     .bp-copy-text { font-size:0.85rem; color:var(--text1); line-height:1.5; margin-bottom:10px; }
     .bp-copy-btn { position:absolute; top:12px; right:12px; font-size:0.7rem; }
 
+    /* Aurora AI section */
+    .bp-aurora-hero { text-align:center; padding:40px 24px; background:linear-gradient(135deg, rgba(99,102,241,0.10), rgba(168,85,247,0.12), rgba(59,130,246,0.08)); border:1px solid var(--border); border-radius:16px; margin-bottom:32px; position:relative; overflow:hidden; }
+    .bp-aurora-hero::before { content:''; position:absolute; top:-40%; right:-20%; width:50%; height:180%; background:radial-gradient(circle, rgba(168,85,247,0.08) 0%, transparent 70%); pointer-events:none; }
+    .bp-aurora-pipeline { display:flex; align-items:stretch; gap:0; overflow-x:auto; padding-bottom:12px; margin-bottom:32px; }
+    .bp-aurora-stage { flex:1; min-width:170px; padding:18px 16px; border:1px solid var(--border); border-radius:14px; background:var(--surface); position:relative; display:flex; flex-direction:column; align-items:center; text-align:center; gap:6px; transition:all 0.2s; }
+    .bp-aurora-stage:hover { border-color:var(--accent); transform:translateY(-2px); box-shadow:0 8px 24px rgba(var(--accent-rgb),0.1); }
+    .bp-aurora-stage.active { border-color:var(--accent); background:linear-gradient(135deg,rgba(var(--accent-rgb),0.06),rgba(168,85,247,0.05)); }
+    .bp-aurora-stage.pending { opacity:0.65; border-style:dashed; }
+    .bp-aurora-stage-icon { font-size:1.6rem; margin-bottom:2px; }
+    .bp-aurora-stage h4 { margin:0; font-size:0.88rem; font-weight:700; color:var(--text); }
+    .bp-aurora-stage p { margin:0; font-size:0.75rem; color:var(--text2); line-height:1.45; }
+    .bp-aurora-stage-badge { display:inline-block; padding:2px 8px; border-radius:99px; font-size:0.6rem; font-weight:700; letter-spacing:0.5px; margin-top:4px; }
+    .bp-aurora-stage-badge.live { background:rgba(34,197,94,0.12); color:#22c55e; }
+    .bp-aurora-stage-badge.soon { background:rgba(245,158,11,0.12); color:#f59e0b; }
+    .bp-aurora-arrow { display:flex; align-items:center; justify-content:center; flex-shrink:0; width:36px; color:var(--text3); font-size:1.2rem; }
+    .bp-aurora-arrow svg { width:20px; height:20px; opacity:0.5; }
+    .bp-aurora-learn-title { font-size:0.85rem; font-weight:600; color:var(--text); margin-bottom:4px; display:flex; align-items:center; gap:6px; }
+    .bp-aurora-learn-title span { font-size:1.1rem; }
+
     /* Nav locked state */
     .nav-item.locked { opacity: 0.35; }
     .nav-item.locked:hover { opacity: 0.5; }
@@ -489,7 +508,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
       .modal { padding: 16px; }
     }
   </style>
-  <script src="https://sdk.twilio.com/js/client/releases/1.14/twilio.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@twilio/voice-sdk@2.18.0/dist/twilio.min.js" defer></script>
 </head>
 <body>
 
@@ -1646,17 +1665,17 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
       <style>
         .agents-page { max-width:100%; overflow:hidden; box-sizing:border-box; }
         .agent-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-bottom:20px; }
-        .agent-card { border-radius:14px; padding:16px; position:relative; overflow:hidden; transition:transform 0.25s ease, box-shadow 0.25s ease; border:1px solid var(--border); display:flex; flex-direction:column; gap:8px; cursor:pointer; }
-        .agent-card::before { content:''; position:absolute; top:0; left:0; right:0; bottom:0; background:linear-gradient(180deg,rgba(var(--accent-rgb),0.04) 0%,transparent 100%); pointer-events:none; border-radius:14px; }
-        .agent-card:hover { transform:translateY(-3px); box-shadow:0 16px 40px rgba(0,0,0,0.12); }
-        .agent-card .agent-avatar { width:42px; height:42px; border-radius:12px; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:20px; background:var(--bg); border:1px solid var(--border); margin-bottom:2px; }
-        .agent-card h3 { color:var(--text); font-size:15px; font-weight:700; margin:0; line-height:1.2; }
-        .agent-card .agent-specialty { color:var(--text3); font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; margin-top:1px; }
-        .agent-card .agent-desc { color:var(--text2); font-size:11px; line-height:1.45; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; flex:1; }
+        .agent-card { border-radius:14px; padding:16px; position:relative; overflow:hidden; transition:transform 0.25s ease, box-shadow 0.25s ease; border:1px solid rgba(255,255,255,0.12); display:flex; flex-direction:column; gap:8px; cursor:pointer; }
+        .agent-card::before { content:''; position:absolute; top:0; left:0; right:0; bottom:0; background:linear-gradient(180deg,rgba(255,255,255,0.08) 0%,transparent 100%); pointer-events:none; border-radius:14px; }
+        .agent-card:hover { transform:translateY(-3px); box-shadow:0 16px 40px rgba(0,0,0,0.25); }
+        .agent-card .agent-avatar { width:42px; height:42px; border-radius:12px; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:20px; background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.15); margin-bottom:2px; }
+        .agent-card h3 { color:#FFFFFF; font-size:15px; font-weight:700; margin:0; line-height:1.2; }
+        .agent-card .agent-specialty { color:rgba(255,255,255,0.65); font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; margin-top:1px; }
+        .agent-card .agent-desc { color:rgba(255,255,255,0.78); font-size:11px; line-height:1.45; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; flex:1; }
         .agent-card-footer { display:flex; align-items:center; justify-content:space-between; gap:6px; margin-top:auto; }
-        .agent-card .agent-voice { color:var(--text3); font-size:9px; }
-        .agent-call-btn { background:var(--accent); border:none; color:#fff; padding:6px 14px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; transition:all 0.2s; display:inline-flex; align-items:center; gap:5px; white-space:nowrap; }
-        .agent-call-btn:hover { opacity:0.9; transform:scale(1.03); }
+        .agent-card .agent-voice { color:rgba(255,255,255,0.5); font-size:9px; }
+        .agent-call-btn { background:rgba(255,255,255,0.2); backdrop-filter:blur(6px); border:1px solid rgba(255,255,255,0.25); color:#fff; padding:6px 14px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; transition:all 0.2s; display:inline-flex; align-items:center; gap:5px; white-space:nowrap; }
+        .agent-call-btn:hover { background:rgba(255,255,255,0.35); transform:scale(1.03); }
         .agent-call-btn svg { width:14px; height:14px; }
         .agent-settings-toggle { background:var(--surface); border:1px solid var(--border); color:var(--text2); padding:7px 14px; border-radius:8px; font-size:12px; font-weight:500; cursor:pointer; display:inline-flex; align-items:center; gap:5px; transition:all 0.15s; }
         .agent-settings-toggle:hover { border-color:var(--accent); color:var(--text); }
@@ -1697,7 +1716,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
         .call-status.status-thinking { color:#f59e0b; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.2); }
         .call-status.status-default { color:rgba(255,255,255,0.5); background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); }
         .call-timer { color:rgba(255,255,255,0.45); font-size:14px; font-weight:600; font-variant-numeric:tabular-nums; letter-spacing:0.5px; margin-top:8px; }
-        .call-transcript { flex:1; overflow-y:auto; padding:12px 24px; scroll-behavior:smooth; position:relative; z-index:1; mask-image:linear-gradient(to bottom,transparent 0px,black 20px,black calc(100% - 20px),transparent 100%); -webkit-mask-image:linear-gradient(to bottom,transparent 0px,black 20px,black calc(100% - 20px),transparent 100%); }
+        .call-transcript { flex:1; min-height:0; overflow-y:auto; padding:12px 24px; scroll-behavior:smooth; position:relative; z-index:1; mask-image:linear-gradient(to bottom,transparent 0px,black 20px,black calc(100% - 20px),transparent 100%); -webkit-mask-image:linear-gradient(to bottom,transparent 0px,black 20px,black calc(100% - 20px),transparent 100%); }
         .call-transcript::-webkit-scrollbar { width:3px; }
         .call-transcript::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.06); border-radius:3px; }
         .call-msg { display:flex; margin-bottom:10px; animation:msgIn 0.25s ease; }
@@ -1846,6 +1865,92 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
         <div class="bp-hero-actions">
           <button class="btn-primary" onclick="navigator.clipboard.writeText(window.location.origin).then(()=>showToast('Link copied!'))">Copy Share Link</button>
           <button class="btn-small" onclick="window.open('https://twitter.com/intent/tweet?text='+encodeURIComponent('Check out Circle for Life — the AI-powered social platform! '+window.location.origin),'_blank')">Share on X</button>
+        </div>
+      </div>
+
+      <!-- ═══ Section: Aurora AI ═══════════════════════════════════════ -->
+      <div class="bp-aurora-hero">
+        <div class="bp-hero-badge" style="background:linear-gradient(135deg,#6366f1,#a855f7);">AURORA AI</div>
+        <h3 class="bp-hero-tagline" style="background:linear-gradient(135deg,#6366f1,#a855f7,#3b82f6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">Intelligent Full-Stack Generation for DCS</h3>
+        <p class="bp-hero-pitch">Aurora empowers DCS employees to build production-ready applications from natural language. Describe what you want, and a multi-agent AI pipeline enhances your prompt, generates the code, and deploys it to GCP &mdash; turning ideas into live apps in minutes. Currently powering frontend generation, with full-stack backend support in development.</p>
+      </div>
+
+      <h3 class="bp-section-title">How Aurora Works</h3>
+      <div class="bp-aurora-pipeline">
+        <div class="bp-aurora-stage active">
+          <div class="bp-aurora-stage-icon">&#128161;</div>
+          <h4>Employee Prompt</h4>
+          <p>A DCS employee describes the application they want to build in plain language</p>
+          <div class="bp-aurora-stage-badge live">ACTIVE</div>
+        </div>
+        <div class="bp-aurora-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
+        <div class="bp-aurora-stage active">
+          <div class="bp-aurora-stage-icon">&#10024;</div>
+          <h4>Prompt Enhancer</h4>
+          <p>AI refines the raw prompt &mdash; adds context, component specs, accessibility rules, and best practices</p>
+          <div class="bp-aurora-stage-badge live">ACTIVE</div>
+        </div>
+        <div class="bp-aurora-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
+        <div class="bp-aurora-stage active">
+          <div class="bp-aurora-stage-icon">&#129504;</div>
+          <h4>Multi-Agent Builder</h4>
+          <p>Specialized AI agents for layout, styling, components, and logic collaborate to build the application</p>
+          <div class="bp-aurora-stage-badge live">ACTIVE</div>
+        </div>
+        <div class="bp-aurora-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
+        <div class="bp-aurora-stage active">
+          <div class="bp-aurora-stage-icon">&#128187;</div>
+          <h4>Frontend Output</h4>
+          <p>Production-ready HTML, CSS, JavaScript, or React code &mdash; tested and optimized</p>
+          <div class="bp-aurora-stage-badge live">LIVE</div>
+        </div>
+        <div class="bp-aurora-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
+        <div class="bp-aurora-stage active">
+          <div class="bp-aurora-stage-icon">&#9729;&#65039;</div>
+          <h4>GCP Deployment</h4>
+          <p>Automatically deployed and hosted on Google Cloud Platform servers</p>
+          <div class="bp-aurora-stage-badge live">LIVE</div>
+        </div>
+        <div class="bp-aurora-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
+        <div class="bp-aurora-stage pending">
+          <div class="bp-aurora-stage-icon">&#9881;&#65039;</div>
+          <h4>Backend Generation</h4>
+          <p>API routes, database schemas, authentication, and server logic &mdash; completing the full-stack vision</p>
+          <div class="bp-aurora-stage-badge soon">IN DEVELOPMENT</div>
+        </div>
+      </div>
+
+      <h3 class="bp-section-title">Impact &amp; Learning</h3>
+      <div class="bp-growth-grid">
+        <div class="bp-card">
+          <div class="bp-card-icon">&#9889;</div>
+          <h4>Accelerated Development</h4>
+          <p>DCS employees go from idea to a working, deployed frontend in minutes instead of days. Eliminates repetitive boilerplate and accelerates prototyping cycles.</p>
+        </div>
+        <div class="bp-card">
+          <div class="bp-card-icon">&#128300;</div>
+          <h4>Smart Prompt Enhancement</h4>
+          <p>Raw ideas are automatically enriched with component specifications, responsive breakpoints, accessibility standards, and UI best practices before reaching the builder.</p>
+        </div>
+        <div class="bp-card">
+          <div class="bp-card-icon">&#129302;</div>
+          <h4>Multi-Agent Collaboration</h4>
+          <p>Instead of one model doing everything, specialized agents handle layout, styling, interactivity, and logic independently &mdash; then merge into a cohesive, production-quality app.</p>
+        </div>
+        <div class="bp-card">
+          <div class="bp-card-icon">&#128257;</div>
+          <h4>Continuous Learning Loop</h4>
+          <p>Every prompt-to-output cycle feeds back into Aurora. The enhancer learns which refinements produce better code, improving output quality with each generation.</p>
+        </div>
+        <div class="bp-card">
+          <div class="bp-card-icon">&#127891;</div>
+          <h4>Developer Skill Growth</h4>
+          <p>Junior developers learn modern frontend patterns by reviewing AI-generated code. Aurora acts as both a builder and a teaching tool &mdash; growing the team's capabilities.</p>
+        </div>
+        <div class="bp-card">
+          <div class="bp-card-icon">&#128640;</div>
+          <h4>Full-Stack Roadmap</h4>
+          <p>Frontend generation is live today. Backend generation (APIs, databases, auth) is in active development &mdash; completing the vision of prompt-to-production full-stack apps on GCP.</p>
         </div>
       </div>
 
@@ -2033,6 +2138,14 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     <div class="call-timer" id="callTimer">0:00</div>
   </div>
   <div class="call-transcript" id="callTranscript"></div>
+  <div id="callBridgePanel" style="display:none; flex:1; flex-direction:column; align-items:center; justify-content:center; gap:16px; position:relative; z-index:1;">
+    <div style="width:80px; height:80px; border-radius:50%; background:rgba(34,197,94,0.12); border:2px solid rgba(34,197,94,0.4); display:flex; align-items:center; justify-content:center; animation:callSpeakPulse 2s ease-in-out infinite;">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.12.96.36 1.9.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.91.34 1.85.58 2.81.7A2 2 0 0122 16.92z"/></svg>
+    </div>
+    <div style="color:#22c55e; font-size:16px; font-weight:700; letter-spacing:0.3px;">Live Bridge Active</div>
+    <div style="color:rgba(255,255,255,0.5); font-size:13px; text-align:center; max-width:260px; line-height:1.5;">You are connected directly to the admin via phone. Speak normally — your voice goes through the phone bridge.</div>
+    <div id="bridgeTimer" style="color:rgba(255,255,255,0.3); font-size:13px; font-variant-numeric:tabular-nums;">0:00</div>
+  </div>
   <div class="call-waveform" id="callWaveform">
     <div class="wbar"></div><div class="wbar"></div><div class="wbar"></div><div class="wbar"></div><div class="wbar"></div>
     <div class="wbar"></div><div class="wbar"></div><div class="wbar"></div><div class="wbar"></div><div class="wbar"></div>
@@ -6252,18 +6365,21 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
 
   function appendCallMessage(role, text) {
     var transcript = document.getElementById('callTranscript');
+    if (!transcript) return;
     var time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     var cls = role === 'user' ? 'user' : role === 'system' ? 'system' : 'agent';
-    transcript.innerHTML += '<div class="call-msg ' + cls + '">' +
-      '<div><div class="call-bubble">' + esc(text) + '</div>' +
-      '<div class="call-time">' + time + '</div></div></div>';
+    var msg = document.createElement('div');
+    msg.className = 'call-msg ' + cls;
+    msg.innerHTML = '<div><div class="call-bubble">' + esc(text) + '</div>' +
+      '<div class="call-time">' + time + '</div></div>';
+    transcript.appendChild(msg);
     transcript.scrollTop = transcript.scrollHeight;
   }
 
   // ── STT Listening (Deepgram primary, Web Speech API fallback) ──
 
   function startAgentListening() {
-    if (!agentCallSession || agentCallProcessing || agentCallMuted) return;
+    if (!agentCallSession || agentCallProcessing || agentCallMuted || liveBridgeActive) return;
 
     // Use Deepgram if key is available
     if (agentCallSession.deepgramKey) {
@@ -6274,7 +6390,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
   }
 
   function startDeepgramListening() {
-    if (!agentCallSession || !agentCallSession.deepgramKey) return;
+    if (!agentCallSession || !agentCallSession.deepgramKey || liveBridgeActive) return;
 
     agentCallListening = true;
     setCallStatus('Listening...', 'listening');
@@ -6364,11 +6480,12 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
       agentCallListening = false;
       animateWaveform(false);
       cleanupInterim();
-      startWebSpeechListening();
+      if (!liveBridgeActive) startWebSpeechListening();
     };
 
     deepgramSocket.onclose = function() {
       if (silenceTimer) clearTimeout(silenceTimer);
+      if (liveBridgeActive) return;  // Don't restart STT during bridge
       if (agentCallListening && !agentCallProcessing) {
         agentCallListening = false;
         animateWaveform(false);
@@ -6383,7 +6500,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
   }
 
   function startWebSpeechListening() {
-    if (!agentCallSession || agentCallProcessing || agentCallMuted) return;
+    if (!agentCallSession || agentCallProcessing || agentCallMuted || liveBridgeActive) return;
 
     var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
@@ -6483,7 +6600,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
 
   // ── Send message to agent ──
   async function sendAgentMessage(text) {
-    if (!agentCallSession || agentCallProcessing) return;
+    if (!agentCallSession || agentCallProcessing || liveBridgeActive) return;
 
     agentCallProcessing = true;
     stopAgentListening();
@@ -6504,12 +6621,20 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
 
       // Check if auto-escalated by supervisor
       if (d.autoEscalated) {
-        appendCallMessage('system', d.autoEscalationMessage || 'A real person has been contacted to help you. They will reach out shortly.');
+        appendCallMessage('system', d.autoEscalationMessage || 'A real person has been contacted to help you.');
         setCallStatus('Connecting to human...', 'thinking');
+        stopAgentListening();
+        animateWaveform(false);
+
         speakAgentResponse(d.text, function() {
           agentCallProcessing = false;
-          setCallStatus('Escalated — still connected', 'default');
-          startAgentListening();
+          // If live bridge token is provided, connect to conference
+          if (d.bridgeToken && typeof Twilio !== 'undefined') {
+            connectTwilioBridge(d.bridgeToken, agentCallSession.id);
+          } else {
+            setCallStatus('Escalated — still connected', 'default');
+            startAgentListening();
+          }
         });
         return;
       }
@@ -6797,6 +6922,99 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     if (agentCallAudio) agentCallAudio.volume = agentCallSpeaker ? 1.0 : 0.0;
   }
 
+  function showBridgeUI(connected) {
+    var overlay = document.getElementById('agentCallOverlay');
+    var transcript = document.getElementById('callTranscript');
+    var waveform = document.getElementById('callWaveform');
+    var bridgePanel = document.getElementById('callBridgePanel');
+    if (connected) {
+      if (transcript) transcript.style.display = 'none';
+      if (waveform) waveform.style.display = 'none';
+      if (bridgePanel) bridgePanel.style.display = 'flex';
+    } else {
+      if (transcript) transcript.style.display = '';
+      if (waveform) waveform.style.display = '';
+      if (bridgePanel) bridgePanel.style.display = 'none';
+    }
+  }
+
+  async function connectTwilioBridge(token, sessionId) {
+    // Stop ALL AI listening and release the microphone completely
+    stopAgentListening();
+    if (agentCallAudio) { agentCallAudio.pause(); agentCallAudio = null; }
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+
+    toast('Calling admin... You will be connected directly.', 'ok');
+    setCallStatus('Calling admin...', 'thinking');
+    appendCallMessage('system', 'Ringing admin phone. You will be connected when they answer.');
+
+    // Brief delay to ensure mic tracks are fully released before Twilio grabs the mic
+    await new Promise(function(r) { setTimeout(r, 400); });
+
+    try {
+      if (twilioDevice) { try { twilioDevice.destroy(); } catch(e) {} }
+      liveBridgeActive = true;
+
+      // v2.x Voice SDK: constructor accepts AccessToken JWT
+      var DeviceClass = (typeof Twilio !== 'undefined' && Twilio.Device) ? Twilio.Device : null;
+      if (!DeviceClass) throw new Error('Twilio Voice SDK not loaded');
+
+      twilioDevice = new DeviceClass(token, { logLevel: 'debug', codecPreferences: ['opus', 'pcmu'] });
+
+      twilioDevice.on('error', function(twilioErr) {
+        console.error('Twilio Device error:', twilioErr);
+      });
+
+      console.log('Twilio Device created, connecting to conference...');
+
+      // v2.x: connect() returns a Promise<Call>; params must be nested under "params"
+      var call = await twilioDevice.connect({ params: { sessionId: sessionId } });
+      twilioConnection = call;
+
+      call.on('accept', function() {
+        console.log('Twilio call accepted — connected to conference');
+        liveBridgeActive = true;
+        setCallStatus('Connected to admin', 'speaking');
+        showBridgeUI(true);
+        toast('Connected to admin!', 'ok');
+      });
+
+      call.on('disconnect', function() {
+        console.log('Twilio call disconnected');
+        liveBridgeActive = false;
+        twilioConnection = null;
+        showBridgeUI(false);
+        setCallStatus('Admin disconnected', 'default');
+        appendCallMessage('system', 'The admin has disconnected. You can continue talking to the AI agent or end the call.');
+        animateWaveform(false);
+        toast('Admin disconnected', 'ok');
+        agentCallProcessing = false;
+        setTimeout(function() { startAgentListening(); }, 1000);
+      });
+
+      call.on('error', function(err) {
+        console.error('Twilio call error:', err);
+        liveBridgeActive = false;
+        twilioConnection = null;
+        showBridgeUI(false);
+        setCallStatus('Bridge error', 'default');
+        appendCallMessage('system', 'Voice bridge error. Resuming AI agent.');
+        toast('Voice bridge error: ' + (err.message || 'Unknown'), 'err');
+        agentCallProcessing = false;
+        startAgentListening();
+      });
+
+    } catch(e) {
+      console.error('Twilio bridge setup failed:', e);
+      liveBridgeActive = false;
+      showBridgeUI(false);
+      toast('Voice bridge setup failed. Admin was still called.', 'err');
+      setCallStatus('Admin called (no bridge)', 'default');
+      agentCallProcessing = false;
+      startAgentListening();
+    }
+  }
+
   async function escalateAgentCall() {
     if (!agentCallSession) return;
     try {
@@ -6810,60 +7028,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
       appendCallMessage('system', d.message);
 
       if (d.method === 'live_bridge' && d.twilioToken && typeof Twilio !== 'undefined') {
-        // Live voice bridge — connect browser to Twilio conference
-        toast('Calling admin... You will be connected directly.', 'ok');
-        setCallStatus('Calling admin...', 'thinking');
-        appendCallMessage('system', 'Ringing admin phone. You will be connected when they answer.');
-
-        try {
-          twilioDevice = new Twilio.Device(d.twilioToken, { debug: false });
-
-          twilioDevice.on('ready', function() {
-            console.log('Twilio Device ready, connecting to conference...');
-            twilioConnection = twilioDevice.connect({ sessionId: agentCallSession.id });
-          });
-
-          twilioDevice.on('connect', function(conn) {
-            console.log('Twilio: connected to conference');
-            twilioConnection = conn;
-            liveBridgeActive = true;
-            setCallStatus('Connected to admin', 'speaking');
-            appendCallMessage('system', 'You are now connected with a real person. Speak normally.');
-            toast('Connected to admin!', 'ok');
-            animateWaveform(true);
-          });
-
-          twilioDevice.on('disconnect', function() {
-            console.log('Twilio: disconnected from conference');
-            liveBridgeActive = false;
-            twilioConnection = null;
-            setCallStatus('Admin disconnected', 'default');
-            appendCallMessage('system', 'The admin has disconnected. You can continue talking to the AI agent or end the call.');
-            animateWaveform(false);
-            toast('Admin disconnected', 'ok');
-            // Resume AI agent listening
-            agentCallProcessing = false;
-            setTimeout(function() { startAgentListening(); }, 1000);
-          });
-
-          twilioDevice.on('error', function(err) {
-            console.error('Twilio Device error:', err);
-            liveBridgeActive = false;
-            setCallStatus('Bridge error', 'default');
-            appendCallMessage('system', 'Could not connect to admin. Resuming AI agent.');
-            toast('Voice bridge error: ' + (err.message || 'Unknown'), 'err');
-            agentCallProcessing = false;
-            startAgentListening();
-          });
-
-        } catch(twilioErr) {
-          console.error('Twilio setup failed:', twilioErr);
-          toast('Voice bridge setup failed. Admin was still called.', 'err');
-          setCallStatus('Admin called (no bridge)', 'default');
-          agentCallProcessing = false;
-          startAgentListening();
-        }
-
+        connectTwilioBridge(d.twilioToken, agentCallSession.id);
       } else if (d.method === 'twilio_call_placed') {
         toast('Phone call placed to admin.', 'ok');
         setCallStatus('Admin notified via phone', 'default');
@@ -6921,7 +7086,8 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
       msgCount = d.messageCount || 0;
     } catch(e) {}
 
-    // Hide call overlay
+    // Reset bridge UI and hide call overlay
+    showBridgeUI(false);
     document.getElementById('agentCallOverlay').style.display = 'none';
     agentCallSession = null;
     agentCallMuted = false;
