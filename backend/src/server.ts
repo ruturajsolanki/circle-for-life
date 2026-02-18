@@ -4,6 +4,7 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import jwt from '@fastify/jwt';
 import formbody from '@fastify/formbody';
+import { ZodError } from 'zod';
 
 import { env } from './config/env.js';
 import { logger } from './utils/logger.js';
@@ -143,6 +144,16 @@ async function buildServer() {
 
   app.setErrorHandler((error, request, reply) => {
     logger.error({ err: error, req: request }, 'Unhandled error');
+
+    if (error instanceof ZodError) {
+      return reply.status(400).send({
+        error: {
+          code: 'SYS_003',
+          message: 'Invalid request format',
+          details: error.issues,
+        },
+      });
+    }
 
     if (error.validation) {
       return reply.status(400).send({

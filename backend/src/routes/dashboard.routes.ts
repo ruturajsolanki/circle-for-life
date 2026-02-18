@@ -474,6 +474,21 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
 
       /* flex rows that should stack */
       [style*="display:flex"][style*="gap:12px"] { flex-wrap: wrap !important; }
+
+      /* ─ Agent call overlay (mobile) ─ */
+      #agentCallOverlay .call-header { padding: 20px 14px 10px; }
+      #agentCallOverlay .call-avatar-ring { width: 84px; height: 84px; font-size: 34px; margin-bottom: 12px; }
+      #agentCallOverlay .call-agent-name { font-size: 20px; }
+      #agentCallOverlay .call-agent-specialty { font-size: 11px; letter-spacing: 0.7px; }
+      #agentCallOverlay .call-transcript { padding: 8px 12px; mask-image:none; -webkit-mask-image:none; }
+      #agentCallOverlay .call-msg .call-bubble { max-width: 88%; }
+      #agentCallOverlay .call-controls { gap: 12px; padding: 14px 10px; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+      #agentCallOverlay .call-ctrl-btn { width: 48px; height: 48px; }
+      #agentCallOverlay .call-ctrl-btn.end-call { width: 56px; height: 56px; }
+      #agentCallOverlay .call-ctrl-btn svg { width: 20px; height: 20px; }
+      #agentCallOverlay .call-human-screen { padding: 10px 14px 6px; }
+      #agentCallOverlay .call-human-title { font-size: 22px; max-width: 360px; }
+      #agentCallOverlay .call-human-subtitle { font-size: 14px; max-width: 360px; }
     }
 
     /* ════════ SMALL MOBILE ≤ 480px ════════ */
@@ -487,9 +502,17 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
       .auth-logo h1 { font-size: 24px; }
       .chat-input button { padding: 8px 10px; font-size: 11px; }
       .modal { padding: 16px; }
+      #agentCallOverlay .call-agent-name { font-size: 18px; }
+      #agentCallOverlay .call-human-title { font-size: 19px; }
+      #agentCallOverlay .call-human-subtitle { font-size: 13px; }
+      #agentCallOverlay .call-human-badge { font-size: 10px; padding: 4px 10px; }
+      #agentCallOverlay .call-controls { gap: 10px; padding: 12px 8px; padding-bottom: max(14px, env(safe-area-inset-bottom)); }
+      #agentCallOverlay .call-ctrl-btn { width: 44px; height: 44px; }
+      #agentCallOverlay .call-ctrl-btn.end-call { width: 52px; height: 52px; }
+      #agentCallOverlay .call-ctrl-btn svg { width: 18px; height: 18px; }
     }
   </style>
-  <script src="https://sdk.twilio.com/js/client/releases/1.14/twilio.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@twilio/voice-sdk@2.10.0/dist/twilio.min.js" defer></script>
 </head>
 <body>
 
@@ -1688,6 +1711,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
         .call-avatar-ring { width:96px; height:96px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:42px; margin:0 auto 16px; border:3px solid rgba(255,255,255,0.12); position:relative; background:rgba(255,255,255,0.04); backdrop-filter:blur(12px); transition:all 0.4s ease; }
         .call-avatar-ring.speaking { border-color:rgba(var(--accent-rgb),0.5); animation:callSpeakPulse 1.5s ease-in-out infinite; }
         .call-avatar-ring.listening { border-color:rgba(34,197,94,0.5); box-shadow:0 0 0 6px rgba(34,197,94,0.1); }
+        .call-avatar-ring.human { border-color:rgba(34,197,94,0.55); box-shadow:0 0 0 10px rgba(34,197,94,0.12); }
         @keyframes callSpeakPulse { 0%,100% { box-shadow:0 0 0 0 rgba(var(--accent-rgb),0.35); } 50% { box-shadow:0 0 0 20px rgba(var(--accent-rgb),0); } }
         .call-agent-name { color:#fff; font-size:22px; font-weight:800; margin-bottom:4px; letter-spacing:-0.3px; }
         .call-agent-specialty { color:rgba(255,255,255,0.4); font-size:12px; font-weight:500; margin-bottom:6px; text-transform:uppercase; letter-spacing:1px; }
@@ -1695,8 +1719,14 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
         .call-status.status-listening { color:#22c55e; background:rgba(34,197,94,0.1); border:1px solid rgba(34,197,94,0.2); }
         .call-status.status-speaking { color:var(--accent); background:rgba(var(--accent-rgb),0.1); border:1px solid rgba(var(--accent-rgb),0.2); }
         .call-status.status-thinking { color:#f59e0b; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.2); }
+        .call-status.status-human { color:#22c55e; background:rgba(34,197,94,0.12); border:1px solid rgba(34,197,94,0.3); }
         .call-status.status-default { color:rgba(255,255,255,0.5); background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); }
         .call-timer { color:rgba(255,255,255,0.45); font-size:14px; font-weight:600; font-variant-numeric:tabular-nums; letter-spacing:0.5px; margin-top:8px; }
+        .call-human-screen { display:none; flex:1; align-items:center; justify-content:center; flex-direction:column; text-align:center; padding:16px 24px 8px; position:relative; z-index:1; }
+        .call-human-badge { font-size:11px; font-weight:700; letter-spacing:1px; color:#22c55e; border:1px solid rgba(34,197,94,0.4); background:rgba(34,197,94,0.12); padding:5px 12px; border-radius:999px; margin-bottom:16px; }
+        .call-human-title { color:#fff; font-size:26px; font-weight:800; line-height:1.1; margin-bottom:10px; letter-spacing:-0.4px; max-width:520px; }
+        .call-human-subtitle { color:rgba(255,255,255,0.72); font-size:15px; line-height:1.5; max-width:560px; margin-bottom:8px; }
+        .call-human-tip { color:rgba(255,255,255,0.45); font-size:12px; }
         .call-transcript { flex:1; overflow-y:auto; padding:12px 24px; scroll-behavior:smooth; position:relative; z-index:1; mask-image:linear-gradient(to bottom,transparent 0px,black 20px,black calc(100% - 20px),transparent 100%); -webkit-mask-image:linear-gradient(to bottom,transparent 0px,black 20px,black calc(100% - 20px),transparent 100%); }
         .call-transcript::-webkit-scrollbar { width:3px; }
         .call-transcript::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.06); border-radius:3px; }
@@ -1724,6 +1754,10 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
         .call-ctrl-btn.end-call { background:#ef4444; border-color:#ef4444; width:62px; height:62px; box-shadow:0 4px 20px rgba(239,68,68,0.3); }
         .call-ctrl-btn.end-call:hover { background:#dc2626; box-shadow:0 4px 24px rgba(239,68,68,0.5); }
         .call-ctrl-btn svg { width:22px; height:22px; }
+        #agentCallOverlay.human-bridge-active .call-transcript { display:none; }
+        #agentCallOverlay.human-bridge-active .call-waveform { display:none; }
+        #agentCallOverlay.human-bridge-active .call-human-screen { display:flex; }
+        #agentCallOverlay.human-bridge-active #callEscalateBtn { display:none; }
       </style>
       <div class="agents-page">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
@@ -2031,6 +2065,12 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     <div class="call-agent-specialty" id="callAgentSpecialty"></div>
     <div class="call-status status-default" id="callStatus">Connecting...</div>
     <div class="call-timer" id="callTimer">0:00</div>
+  </div>
+  <div class="call-human-screen" id="callHumanScreen">
+    <div class="call-human-badge">LIVE SUPPORT</div>
+    <div class="call-human-title">Connected to Human Support</div>
+    <div class="call-human-subtitle" id="callHumanSubtitle">You are now speaking directly with an admin.</div>
+    <div class="call-human-tip">Keep this screen open and use your microphone normally.</div>
   </div>
   <div class="call-transcript" id="callTranscript"></div>
   <div class="call-waveform" id="callWaveform">
@@ -6218,6 +6258,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
       // Show call overlay
       var overlay = document.getElementById('agentCallOverlay');
       overlay.style.display = 'flex';
+      setHumanBridgeScreen(false);
       document.getElementById('callAgentAvatar').textContent = d.agent.avatar;
       document.getElementById('callAgentAvatar').style.background = 'linear-gradient(135deg,' + d.agent.color1 + ',' + d.agent.color2 + ')';
       document.getElementById('callAgentName').textContent = d.agent.name;
@@ -6263,7 +6304,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
   // ── STT Listening (Deepgram primary, Web Speech API fallback) ──
 
   function startAgentListening() {
-    if (!agentCallSession || agentCallProcessing || agentCallMuted) return;
+    if (!agentCallSession || agentCallProcessing || agentCallMuted || liveBridgeActive) return;
 
     // Use Deepgram if key is available
     if (agentCallSession.deepgramKey) {
@@ -6750,9 +6791,22 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     el.textContent = text;
     el.className = 'call-status status-' + (mode || 'default');
     var avatar = document.getElementById('callAgentAvatar');
-    avatar.classList.remove('speaking', 'listening');
+    avatar.classList.remove('speaking', 'listening', 'human');
     if (mode === 'listening') avatar.classList.add('listening');
     if (mode === 'speaking') avatar.classList.add('speaking');
+    if (mode === 'human') avatar.classList.add('human');
+  }
+
+  function setHumanBridgeScreen(active, subtitleText) {
+    var overlay = document.getElementById('agentCallOverlay');
+    if (!overlay) return;
+    if (active) overlay.classList.add('human-bridge-active');
+    else overlay.classList.remove('human-bridge-active');
+
+    var subtitle = document.getElementById('callHumanSubtitle');
+    if (subtitle) {
+      subtitle.textContent = subtitleText || 'You are now speaking directly with an admin.';
+    }
   }
 
   function animateWaveform(active) {
@@ -6801,6 +6855,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     if (!agentCallSession) return;
     try {
       setCallStatus('Escalating to human...', 'thinking');
+      setHumanBridgeScreen(false);
       stopAgentListening();
       animateWaveform(false);
       if (agentCallAudio) { agentCallAudio.pause(); agentCallAudio = null; }
@@ -6816,27 +6871,19 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
         appendCallMessage('system', 'Ringing admin phone. You will be connected when they answer.');
 
         try {
+          if (!Twilio.Device || typeof Twilio.Device !== 'function') {
+            throw new Error('Twilio Voice SDK unavailable');
+          }
+
           twilioDevice = new Twilio.Device(d.twilioToken, { debug: false });
+          var connectStarted = false;
 
-          twilioDevice.on('ready', function() {
-            console.log('Twilio Device ready, connecting to conference...');
-            twilioConnection = twilioDevice.connect({ sessionId: agentCallSession.id });
-          });
-
-          twilioDevice.on('connect', function(conn) {
-            console.log('Twilio: connected to conference');
-            twilioConnection = conn;
-            liveBridgeActive = true;
-            setCallStatus('Connected to admin', 'speaking');
-            appendCallMessage('system', 'You are now connected with a real person. Speak normally.');
-            toast('Connected to admin!', 'ok');
-            animateWaveform(true);
-          });
-
-          twilioDevice.on('disconnect', function() {
+          function handleBridgeDisconnected() {
+            if (!liveBridgeActive && !twilioConnection) return;
             console.log('Twilio: disconnected from conference');
             liveBridgeActive = false;
             twilioConnection = null;
+            setHumanBridgeScreen(false);
             setCallStatus('Admin disconnected', 'default');
             appendCallMessage('system', 'The admin has disconnected. You can continue talking to the AI agent or end the call.');
             animateWaveform(false);
@@ -6844,20 +6891,68 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
             // Resume AI agent listening
             agentCallProcessing = false;
             setTimeout(function() { startAgentListening(); }, 1000);
-          });
+          }
 
-          twilioDevice.on('error', function(err) {
+          function handleBridgeConnected(conn) {
+            if (liveBridgeActive) return;
+            console.log('Twilio: connected to conference');
+            twilioConnection = conn || twilioConnection;
+            liveBridgeActive = true;
+            setHumanBridgeScreen(true, 'You are now speaking directly with an admin.');
+            setCallStatus('Connected to admin', 'human');
+            appendCallMessage('system', 'You are now connected with a real person. Speak normally.');
+            toast('Connected to admin!', 'ok');
+            animateWaveform(true);
+            if (conn && typeof conn.on === 'function') {
+              conn.on('disconnect', handleBridgeDisconnected);
+              conn.on('cancel', handleBridgeDisconnected);
+            }
+          }
+
+          function handleBridgeError(err) {
             console.error('Twilio Device error:', err);
             liveBridgeActive = false;
+            setHumanBridgeScreen(false);
             setCallStatus('Bridge error', 'default');
             appendCallMessage('system', 'Could not connect to admin. Resuming AI agent.');
-            toast('Voice bridge error: ' + (err.message || 'Unknown'), 'err');
+            toast('Voice bridge error: ' + ((err && err.message) || 'Unknown'), 'err');
             agentCallProcessing = false;
             startAgentListening();
-          });
+          }
+
+          function connectToConference() {
+            if (connectStarted || !agentCallSession) return;
+            connectStarted = true;
+            console.log('Twilio Device connecting to conference...');
+            try {
+              var connectResult = twilioDevice.connect({ params: { sessionId: agentCallSession.id } });
+              if (connectResult && typeof connectResult.then === 'function') {
+                connectResult.then(handleBridgeConnected).catch(handleBridgeError);
+              } else if (connectResult) {
+                twilioConnection = connectResult;
+              }
+            } catch (connectErr) {
+              handleBridgeError(connectErr);
+            }
+          }
+
+          twilioDevice.on('registered', connectToConference);
+          twilioDevice.on('ready', connectToConference); // backwards-compat for older SDK events
+          twilioDevice.on('connect', handleBridgeConnected);
+          twilioDevice.on('disconnect', handleBridgeDisconnected);
+          twilioDevice.on('error', handleBridgeError);
+
+          if (typeof twilioDevice.register === 'function') {
+            twilioDevice.register().catch(handleBridgeError);
+            // Some SDK builds can connect before/without explicit register event.
+            setTimeout(connectToConference, 1500);
+          } else {
+            connectToConference();
+          }
 
         } catch(twilioErr) {
           console.error('Twilio setup failed:', twilioErr);
+          setHumanBridgeScreen(false);
           toast('Voice bridge setup failed. Admin was still called.', 'err');
           setCallStatus('Admin called (no bridge)', 'default');
           agentCallProcessing = false;
@@ -6865,6 +6960,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
         }
 
       } else if (d.method === 'twilio_call_placed') {
+        setHumanBridgeScreen(false);
         toast('Phone call placed to admin.', 'ok');
         setCallStatus('Admin notified via phone', 'default');
         speakAgentResponse('Your request has been escalated. An admin has been notified via phone.', function() {
@@ -6873,6 +6969,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
           startAgentListening();
         });
       } else {
+        setHumanBridgeScreen(false);
         toast(d.message, 'ok');
         setCallStatus('Escalated', 'default');
         speakAgentResponse('Your request has been escalated. An admin will review your case.', function() {
@@ -6882,6 +6979,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
         });
       }
     } catch(e) {
+      setHumanBridgeScreen(false);
       toast('Escalation failed: ' + e.message, 'err');
       setCallStatus('Escalation failed', 'default');
       agentCallProcessing = false;
@@ -6896,6 +6994,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     if (twilioConnection) { try { twilioConnection.disconnect(); } catch(e) {} twilioConnection = null; }
     if (twilioDevice) { try { twilioDevice.destroy(); } catch(e) {} twilioDevice = null; }
     liveBridgeActive = false;
+    setHumanBridgeScreen(false);
 
     stopAgentListening();
     if (agentCallTimer) { clearInterval(agentCallTimer); agentCallTimer = null; }
