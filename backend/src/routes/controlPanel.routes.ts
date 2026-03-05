@@ -12,14 +12,15 @@ import {
 const chatProviders: ChatProvider[] = [
   'openai', 'anthropic', 'google', 'groq', 'mistral', 'openrouter', 'together', 'deepseek', 'kaggle',
 ];
+const CHAT_PROVIDERS_WITH_DEFAULT = [...chatProviders, 'server_default'] as const;
 
 const imageProviders: ImageProvider[] = [
   'openai', 'stability', 'bfl', 'replicate', 'runpod', 'fal',
 ];
 
 const chatRequestSchema = z.object({
-  provider: z.enum(chatProviders as [string, ...string[]]),
-  apiKey: z.string().min(1, 'API key is required').or(z.literal('ollama')),
+  provider: z.enum(CHAT_PROVIDERS_WITH_DEFAULT as unknown as [string, ...string[]]),
+  apiKey: z.string().optional().default(''),
   model: z.string().optional(),
   baseUrl: z.string().url().optional(),
   messages: z.array(
@@ -71,18 +72,32 @@ export async function controlPanelRoutes(app: FastifyInstance) {
   /**
    * POST /control-panel/chat
    * Send a chat completion to any provider.
-   * User supplies their own API key — we proxy the request.
+   * Supports 'server_default' to use the server's Groq key.
    */
   app.post('/chat', {
     preHandler: [localAuthenticate],
     handler: async (request, reply) => {
       const body = chatRequestSchema.parse(request.body);
 
+      let resolvedProvider = body.provider as string;
+      let resolvedKey = body.apiKey || '';
+      let resolvedModel = body.model;
+
+      if (resolvedProvider === 'server_default' || (!resolvedKey && resolvedProvider !== 'kaggle')) {
+        const serverKey = process.env.GROQ_API_KEY || process.env.DEFAULT_LLM_KEY || '';
+        if (!serverKey) {
+          return reply.status(400).send({ error: { message: 'No server API key configured. Please provide your own.' } });
+        }
+        resolvedProvider = process.env.DEFAULT_LLM_PROVIDER || 'groq';
+        resolvedKey = serverKey;
+        if (!resolvedModel) resolvedModel = 'llama-3.1-8b-instant';
+      }
+
       const result = await ControlPanelService.chat({
         provider: {
-          provider: body.provider as ChatProvider,
-          apiKey: body.apiKey,
-          model: body.model,
+          provider: resolvedProvider as ChatProvider,
+          apiKey: resolvedKey,
+          model: resolvedModel,
           baseUrl: body.baseUrl,
         },
         messages: body.messages,
@@ -130,13 +145,23 @@ export async function controlPanelRoutes(app: FastifyInstance) {
     preHandler: [localAuthenticate],
     handler: async (request, reply) => {
       const body = z.object({
-        provider: z.enum(chatProviders as [string, ...string[]]),
-        apiKey: z.string().min(1).or(z.literal('ollama')),
+        provider: z.enum(CHAT_PROVIDERS_WITH_DEFAULT as unknown as [string, ...string[]]),
+        apiKey: z.string().optional().default(''),
       }).parse(request.body);
 
+      let prov = body.provider as string;
+      let key = body.apiKey || '';
+
+      if (prov === 'server_default' || (!key && prov !== 'kaggle')) {
+        const serverKey = process.env.GROQ_API_KEY || process.env.DEFAULT_LLM_KEY || '';
+        if (!serverKey) return reply.send({ models: [] });
+        prov = process.env.DEFAULT_LLM_PROVIDER || 'groq';
+        key = serverKey;
+      }
+
       const result = await ControlPanelService.fetchLiveModels(
-        body.provider as ChatProvider,
-        body.apiKey,
+        prov as ChatProvider,
+        key,
       );
 
       return reply.send(result);

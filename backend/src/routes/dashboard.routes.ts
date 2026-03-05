@@ -965,9 +965,10 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
         <!-- Provider Row -->
         <div class="chat-settings">
           <select id="chatProvider" onchange="onProviderChange()">
-            <option value="groq" selected>Groq (Fast &mdash; recommended)</option>
+            <option value="server_default" selected>Server Default (Groq) &mdash; No Key Needed</option>
             <option value="local">&#9889; Local LLM (In-Browser)</option>
-            <optgroup label="Cloud Providers">
+            <optgroup label="Cloud Providers (Your Own Key)">
+              <option value="groq">Groq</option>
               <option value="openai">OpenAI</option>
               <option value="anthropic">Anthropic</option>
               <option value="google">Google Gemini</option>
@@ -980,11 +981,11 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
               <option value="kaggle">Kaggle / Ollama (Free GPU)</option>
             </optgroup>
           </select>
-          <!-- API key (hidden for local) -->
+          <!-- API key (hidden for server_default and local) -->
           <input type="password" id="chatKey" placeholder="API Key" style="display:none" oninput="onApiKeyInput()">
           <!-- Model dropdown (populated dynamically) -->
           <select id="chatModel" style="display:none;min-width:220px;">
-            <option value="">Enter API key to load models...</option>
+            <option value="">Select a model...</option>
           </select>
           <span id="modelStatus" style="font-size:11px;color:var(--text3);white-space:nowrap;"></span>
         </div>
@@ -1033,7 +1034,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
         </div>
 
         <div class="chat-box" id="chatBox">
-          <div class="empty-state"><p>Select a provider to get started. For cloud providers, enter your API key and models will auto-load. For Local LLM, pick a model to download and run entirely in your browser.</p></div>
+          <div class="empty-state"><p>Start chatting right away — the Server Default (Groq) provider works instantly with no API key. Or pick a cloud provider with your own key, or run a Local LLM entirely in your browser.</p></div>
         </div>
         <!-- Live Recording Banner -->
         <div id="voiceRecBanner" style="display:none;padding:12px 16px;background:linear-gradient(135deg,rgba(239,68,68,0.12),rgba(239,68,68,0.05));border:1px solid rgba(239,68,68,0.3);border-bottom:none;border-radius:var(--radius) var(--radius) 0 0;">
@@ -1330,14 +1331,17 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
             <div class="form-group" style="flex:1;min-width:150px;">
               <label>LLM Provider</label>
               <select class="form-input" id="voiceTransProvider" onchange="onTransProviderChange()">
-                <option value="groq" selected>Groq (Fast &mdash; recommended)</option>
-                <option value="local_llm">Local LLM (WebLLM — Offline)</option>
+                <option value="server_default" selected>Server Default (Groq) &mdash; No Key Needed</option>
+                <option value="local_llm">Local LLM (WebLLM &mdash; Offline)</option>
                 <option value="kaggle">Kaggle / Ollama (Free GPU)</option>
-                <option value="openai">OpenAI</option>
-                <option value="anthropic">Anthropic</option>
-                <option value="google">Google Gemini</option>
-                <option value="mistral">Mistral AI</option>
-                <option value="deepseek">DeepSeek</option>
+                <optgroup label="Cloud Providers (Your Own Key)">
+                  <option value="groq">Groq</option>
+                  <option value="openai">OpenAI</option>
+                  <option value="anthropic">Anthropic</option>
+                  <option value="google">Google Gemini</option>
+                  <option value="mistral">Mistral AI</option>
+                  <option value="deepseek">DeepSeek</option>
+                </optgroup>
               </select>
             </div>
             <div class="form-group" id="voiceTransKeyGroup" style="flex:1;min-width:150px;display:none;">
@@ -3223,10 +3227,19 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     const kagglePanel = document.getElementById('kaggleChatPanel');
     const statusEl = document.getElementById('modelStatus');
 
-    if (prov === 'local_llm' || prov === 'local') {
+    if (prov === 'server_default') {
+      keyInput.style.display = 'none';
+      modelSel.style.display = '';
+      localPanel.style.display = 'none';
+      kagglePanel.style.display = 'none';
+      statusEl.textContent = 'Using server Groq — no API key needed';
+      modelSel.innerHTML = '<option value="llama-3.1-8b-instant">llama-3.1-8b-instant (Fast)</option><option value="llama-3.3-70b-versatile">llama-3.3-70b-versatile</option><option value="mixtral-8x7b-32768">mixtral-8x7b-32768</option>';
+      fetchModels();
+    } else if (prov === 'local_llm' || prov === 'local') {
       if (!hasFeature('local_llm')) {
         toast('Local LLM unlocks at Level 3 — Creator', 'err');
-        document.getElementById('chatProvider').value = '';
+        document.getElementById('chatProvider').value = 'server_default';
+        onProviderChange();
         return;
       }
       keyInput.style.display = 'none';
@@ -3241,7 +3254,6 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
       kagglePanel.style.display = '';
       statusEl.textContent = 'Kaggle Ollama — free GPU-powered LLM';
       modelSel.innerHTML = '<option value="llama3.2:3b">llama3.2:3b</option><option value="llama3.1:8b">llama3.1:8b</option><option value="mistral:7b">mistral:7b</option><option value="phi3:mini">phi3:mini</option><option value="gemma2:2b">gemma2:2b</option><option value="qwen2.5:7b">qwen2.5:7b</option>';
-      // Auto-fetch live models if URL is set
       var kagUrl = document.getElementById('chatKaggleUrl').value;
       if (kagUrl) fetchKaggleChatModels();
     } else {
@@ -3251,7 +3263,6 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
       kagglePanel.style.display = 'none';
       statusEl.textContent = '';
       modelSel.innerHTML = '<option value="">Enter API key to load models...</option>';
-      // If key already has value, try fetching
       if (keyInput.value.length > 5) onApiKeyInput();
     }
     saveChatSettings();
@@ -3319,7 +3330,8 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
   async function fetchModels() {
     const prov = document.getElementById('chatProvider').value;
     const key = document.getElementById('chatKey').value;
-    if (!prov || prov === 'local_llm' || prov === 'local' || prov === 'kaggle' || !key) return;
+    if (!prov || prov === 'local_llm' || prov === 'local' || prov === 'kaggle') return;
+    if (prov !== 'server_default' && !key) return;
 
     const statusEl = document.getElementById('modelStatus');
     const modelSel = document.getElementById('chatModel');
@@ -3327,7 +3339,7 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     modelSel.innerHTML = '<option value="">Loading...</option>';
 
     try {
-      const d = await api('POST', '/v1/control-panel/models', { provider: prov, apiKey: key });
+      const d = await api('POST', '/v1/control-panel/models', { provider: prov, apiKey: key || '' });
       if (d.models && d.models.length > 0) {
         modelSel.innerHTML = d.models.map(m =>
           '<option value="' + esc(m.id) + '">' + esc(m.name || m.id) + (m.owned_by ? ' (' + esc(m.owned_by) + ')' : '') + '</option>'
@@ -3483,8 +3495,16 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
           messages: chatHistory, maxTokens: 2048,
         });
         chatHistory.push({ role: 'assistant', content: d.content });
+      } else if (prov === 'server_default') {
+        // ── Server default (Groq) — no key needed ──
+        const model = document.getElementById('chatModel').value || 'llama-3.1-8b-instant';
+        const d = await api('POST', '/v1/control-panel/chat', {
+          provider: 'server_default', model, apiKey: '',
+          messages: chatHistory, maxTokens: 2048,
+        });
+        chatHistory.push({ role: 'assistant', content: d.content });
       } else {
-        // ── Cloud provider ──
+        // ── Cloud provider (own key) ──
         const key = document.getElementById('chatKey').value;
         if (!key) { throw new Error('Enter an API key'); }
         const model = document.getElementById('chatModel').value || undefined;
@@ -4321,7 +4341,8 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
     const provider = document.getElementById('voiceTransProvider').value;
     const isLocal = provider === 'local_llm';
     const isKaggle = provider === 'kaggle';
-    document.getElementById('voiceTransKeyGroup').style.display = (isLocal || isKaggle) ? 'none' : '';
+    const isServerDefault = provider === 'server_default';
+    document.getElementById('voiceTransKeyGroup').style.display = (isLocal || isKaggle || isServerDefault) ? 'none' : '';
     document.getElementById('kaggleTransPanel').style.display = isKaggle ? '' : 'none';
     document.getElementById('localLlmTransHint').style.display = isLocal ? 'flex' : 'none';
     if (isLocal) {
@@ -4421,8 +4442,19 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
         document.getElementById('transResultMeta').innerHTML =
           'Provider: <strong>Kaggle / Ollama</strong> | Model: <strong>' + esc(d.model) + '</strong> | ' + d.latencyMs + 'ms';
         toast('Translation complete (Kaggle)!', 'ok');
+      } else if (provider === 'server_default') {
+        // ── Server default (Groq) — no key needed ──
+        const d = await api('POST', '/v1/translate/text', {
+          text, sourceLang: srcLang, targetLang: tgtLang, provider: 'server_default', apiKey: '',
+          sourceType: textMode ? 'text' : 'voice',
+        });
+        document.getElementById('transResult').style.display = '';
+        document.getElementById('transResultText').textContent = d.translatedText;
+        document.getElementById('transResultMeta').innerHTML =
+          'Provider: <strong>' + esc(d.provider) + '</strong> | Model: <strong>' + esc(d.model) + '</strong> | ' + d.latencyMs + 'ms';
+        toast('Translation complete!', 'ok');
       } else {
-        // ── Cloud provider translation (via server) ──
+        // ── Cloud provider translation (own key) ──
         const apiKey = document.getElementById('voiceTransKey').value.trim();
         if (!apiKey) { toast('Enter your API key', 'err'); btn.innerHTML = 'Translate'; btn.disabled = false; return; }
         const d = await api('POST', '/v1/translate/text', {
@@ -4468,6 +4500,14 @@ const PAGE_HTML = /*html*/ `<!DOCTYPE html>
       if (!kaggleUrl) { toast('Enter your Kaggle ngrok URL', 'err'); return; }
       try {
         var d = await api('POST', '/v1/translate/detect', { text, provider: 'kaggle', apiKey: 'ollama', baseUrl: kaggleUrl });
+        toast('Detected: ' + d.language + ' (confidence: ' + d.confidence + ')', 'ok');
+      } catch(e) { toast('Detection failed: ' + (e.message || e), 'err'); }
+      return;
+    }
+
+    if (provider === 'server_default') {
+      try {
+        const d = await api('POST', '/v1/translate/detect', { text, provider: 'server_default', apiKey: '' });
         toast('Detected: ' + d.language + ' (confidence: ' + d.confidence + ')', 'ok');
       } catch(e) { toast('Detection failed: ' + (e.message || e), 'err'); }
       return;

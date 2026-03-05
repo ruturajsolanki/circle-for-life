@@ -34,13 +34,24 @@ export async function translateRoutes(app: FastifyInstance) {
         text: z.string().min(1).max(10000),
         sourceLang: z.string().optional().default(''),
         targetLang: z.string().min(1),
-        provider: z.string().min(1),
-        apiKey: z.string().min(1),
+        provider: z.string().optional().default('server_default'),
+        apiKey: z.string().optional().default(''),
         model: z.string().optional(),
         baseUrl: z.string().url().optional(),
         sourceType: z.enum(['text', 'voice']).optional().default('text'),
         saveHistory: z.boolean().optional().default(true),
       }).parse(request.body);
+
+      let prov = body.provider;
+      let key = body.apiKey;
+      let model = body.model;
+      if (prov === 'server_default' || (!key && prov !== 'kaggle')) {
+        const serverKey = process.env.GROQ_API_KEY || process.env.DEFAULT_LLM_KEY || '';
+        if (!serverKey) return reply.status(400).send({ error: 'No server API key configured.' });
+        prov = process.env.DEFAULT_LLM_PROVIDER || 'groq';
+        key = serverKey;
+        if (!model) model = 'llama-3.1-8b-instant';
+      }
 
       const userId = (request as any).user?.id;
 
@@ -49,9 +60,9 @@ export async function translateRoutes(app: FastifyInstance) {
           text: body.text,
           sourceLang: body.sourceLang || undefined,
           targetLang: body.targetLang,
-          provider: body.provider as ChatProvider,
-          apiKey: body.apiKey,
-          model: body.model,
+          provider: prov as ChatProvider,
+          apiKey: key,
+          model,
           baseUrl: body.baseUrl,
         });
 
@@ -91,18 +102,29 @@ export async function translateRoutes(app: FastifyInstance) {
     handler: async (request, reply) => {
       const body = z.object({
         text: z.string().min(1).max(5000),
-        provider: z.string().min(1),
-        apiKey: z.string().min(1),
+        provider: z.string().optional().default('server_default'),
+        apiKey: z.string().optional().default(''),
         model: z.string().optional(),
         baseUrl: z.string().url().optional(),
       }).parse(request.body);
 
+      let prov = body.provider;
+      let key = body.apiKey;
+      let model = body.model;
+      if (prov === 'server_default' || (!key && prov !== 'kaggle')) {
+        const serverKey = process.env.GROQ_API_KEY || process.env.DEFAULT_LLM_KEY || '';
+        if (!serverKey) return reply.status(400).send({ error: 'No server API key configured.' });
+        prov = process.env.DEFAULT_LLM_PROVIDER || 'groq';
+        key = serverKey;
+        if (!model) model = 'llama-3.1-8b-instant';
+      }
+
       try {
         const result = await TranslationService.detectLanguage(
           body.text,
-          body.provider as ChatProvider,
-          body.apiKey,
-          body.model,
+          prov as ChatProvider,
+          key,
+          model,
           body.baseUrl,
         );
         return reply.send(result);
